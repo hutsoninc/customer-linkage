@@ -1,0 +1,99 @@
+﻿COL_NAME,LENGTH,COL_TYPE,Primary Key,NULLS_ALLOWED,REMARKS
+ABN,16,char,N,Y,Company business number. Could be used for TIN
+Account_Class,15,char,N,Y,Specifies the Customer Account Class
+address_dpid,10,char,N,Y,Postal system unique ID of the address
+BANK,50,char,N,Y,Contact's Financial Institution
+BANK_ACC,15,char,N,Y,Contact's Bank Account Number
+bank_acc_name,50,char,N,Y,Contact's Bank Account Name
+BANK_BR_NO,10,char,N,Y,Contact's Bank Location (branch) State Number - indicates the Location (branch) of the bank
+BANK_BRANCH,20,char,N,Y,Contact's Bank Location (branch) Number
+bus_phone,15,char,N,Y,Contact's Business Number
+BusinessPhone,15,char,N,Y,Stripped-off version of bus_phone
+change_case_flag,1,char,N,Y,"If Y the Contact will be included when the Change Case Utility is run, else N"
+city,30,char,N,Y,Contact's City
+Ckc_Id,10,numeric,N,Y,Customer Knowledge Center ID
+class,5,char,N,Y,Optional user field
+Cmp_Ckc_Id,10,numeric,N,Y,Records the complimentary ID for businesses and business contacts.
+company_acn,20,char,N,Y,Contact's ANC Number
+company_name,150,varchar,N,Y,Contact's Company Name
+CONTACT_CODE,15,char,Y,N,Contact Code - Program: Contact Maintenance
+contact_type,2,char,N,Y,Optional user field
+country,30,char,N,Y,Contact's Country
+County,40,char,N,Y,County name
+Creation_Date,8,timestamp,N,Y,Creation date of the contact record
+Cust_Delivery_Flag,1,char,N,Y,USA - If Y flag the invoice as requiring delivery to the customer. This alters what tax region the system will use to calculate tax. Else N
+dealer_no,20,char,N,Y,Contact's Dealer Number
+DOB,8,timestamp,N,Y,Contact's Date of Birth
+Driver_Lic_Expiry_Date,8,timestamp,N,Y,Driver Licence Expiration Date
+driver_lic_no,20,char,N,Y,Contact's Driver License Number
+email_address,50,varchar,N,Y,Contact's Email Address
+Email_Address_2,50,varchar,N,Y,Contacts secondary e-mail address.
+fax_no,15,char,N,Y,Contact's Fax Number
+fleet_no,20,char,N,Y,Contact's Fleet Number
+GST_REG_FLAG,1,char,N,Y,"Contact GST Applicable = Y, else N"
+initial,40,varchar,N,Y,Contact's Middle Name Initial
+lang_pref,2,char,N,Y,It indicates the 'Language Preference' for that particular contact
+Last_Ckc_Req,8,timestamp,N,Y,Records the datetime that the contact record was last refreshed from the CKC database.
+Last_Modified_Date,8,timestamp,N,Y,Records last modified date and time
+Last_Xref_Date,8,timestamp,N,Y,Records the datetime that the associated cross reference information was updated in the CKC database.
+marital_status,1,char,N,Y,Contact's Marital Status (Type Code Maintenance = MS)
+Min_CG_Survey_Interval,4,integer,N,Y,Minimum complete goods invoice survey interval
+Min_Parts_Survey_Interval,4,integer,N,Y,Minimum parts invoice survey interval
+Min_rental_Survey_Interval,4,integer,N,Y,Minimum rental invoice survey interval
+Min_Wkshop_Survey_Interval,4,integer,N,Y,Minimum Service (workshop) invoice survey interval
+mob_phone,15,char,N,Y,Contact's Mobile Number
+MobilePhone,15,char,N,Y,Stripped-off version of mob_phone
+name,150,varchar,N,Y,Contact's First Name
+NOTE,4000,char,N,Y,Notes on Contact
+pcode,11,char,N,Y,Contact's Post Code
+postal_address_dpid,10,char,N,Y,Postal system unique ID of the contact's Postal address
+postal_city,30,char,N,Y,Contact's Postal City (Toorak)
+postal_country,30,char,N,Y,Contact's Postal Contact Country
+Postal_County,40,char,N,Y,County name of the postal address
+postal_pcode,11,char,N,Y,Contact's Postal PostCode (3142)
+postal_state,30,char,N,Y,Contact's Postal State (Victoria)
+postal_street_1,65,varchar,N,Y,Contact's Postal Street Address (12 Data Road)
+postal_street_2,65,varchar,N,Y,Contact's Postal Street Address Line 2 (Apartment 2)
+prev_CG_survey_date,8,timestamp,N,Y,Previous complete goods invoice survey date
+Prev_Parts_Survey_Date,8,timestamp,N,Y,Previous parts invoice survey date
+prev_rental_survey_date,8,timestamp,N,Y,Previous rental invoice survey date
+Prev_Wkshop_Survey_Date,8,timestamp,N,Y,Previous Service (workshop) invoice survey date
+Privacy_3rd_Party,1,char,N,Y,3rd Party Privacy Flag
+privacy_marketing,1,char,N,Y,"If Y keep Contact's details private from marketing, else N"
+privacy_other,1,char,N,Y,"If Y keep Contact's details private from other functions, else N"
+Privacy_Parts,1,char,N,Y,If Y keep Contact details private from 3rd party functions.
+privacy_service,1,char,N,Y,"If Y keep Contact's details private from service areas, else N"
+PrivatePhone,15,char,N,Y,Stripped-off version of prv_phone
+prv_phone,15,char,N,Y,Contact's Private Number
+Rental_Insurance_Expiry_Date,8,timestamp,N,Y,Stores the Rental Insurance Expiration Date
+Rental_Insurance_Limit,12,numeric,N,Y,Stores the Rental Insurance Limit
+Rental_Insurance_Policy_No,30,char,N,Y,Stores the Rental Insurance Policy No
+Rental_Insurance_Provider,60,varchar,N,Y,Stores the Rental Insurance Provider
+rta_no,20,char,N,Y,Contact's RTA number
+sex,1,char,N,Y,Contact's Gender
+Social_Security_No,15,char,N,Y,Social Security Number
+state,30,char,N,Y,Contact's State
+street,65,varchar,N,Y,Contact's Street Address
+street_2,65,varchar,N,Y,Contact's Street Address Line 2 (Apartment 2)
+surname,150,varchar,N,Y,Contact's Last Name
+TAX_EXEMPT_NO,16,char,N,Y,Contact's Tax Exempt Number
+Tax_Exempt_Type,15,char,N,Y,Contact's Tax Exempt Type - These codes are set in Type Code Maintenance 
+TAX_FILE_NO,2,char,N,Y,Contact's Tax File Number
+Tax_Region,20,char,N,Y,"Tax Region Code - In USA, sales taxes can be set at the state, municipal and parish levels."
+Tax_Status,2,char,N,Y,"Tax Status: SE - Tax Exempt, ST - Taxable, SN - Never Tax"
+title,15,char,N,Y,Contact's Title (Type Code Maintenance = TI)
+WINDOWS_USER,50,varchar,N,Y,Windows/RACF User
+CreatedByApp,50,varchar,N,Y,Application that created the Contact
+Business_Individual,1,char,N,Y,"B = Business, I = Individual, C = Business Contact"
+Doing_Business_As,150,varchar,N,Y,Company's alternate (doing business as) name
+Familiar_Name,150,varchar,N,Y,"Alternate first name a person goes by (""nickname"")"
+Generation,15,char,N,Y,"Indicates person generation within their family (i.e. I, II, III or JR, SR)"
+Suffix,20,char,N,Y,"To designate a person's credentials such as ""CPA"", ""PHD"", etc."
+Inactive_Indicator,1,char,N,N,"A = Active, I = Inactive"
+Inactive_Reason,15,char,N,Y,"Reason for Inactive Status:  Deceased; Out of Business, Other."
+Inactive_Effect_Date,8,timestamp,N,Y,Date timestamp of update in Inactive Indicator.
+REWARDS_NO,10,numeric,N,Y,Customer's JD Rewards Number
+CreatedByUser,50,varchar,N,Y,User that created the Contact
+ModifiedByApp,50,varchar,N,Y,Application that modified the Contact
+Rewards_Status,15,char,N,Y,Customer's JD Rewards status
+Rewards_Points,12,numeric,N,Y,Customer's JD Rewards points

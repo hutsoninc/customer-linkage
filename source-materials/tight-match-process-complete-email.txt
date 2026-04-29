@@ -1,0 +1,46 @@
+The below customer file has been processed and ready for your review.
+
+Uploaded By: X286786
+Dealer Account: 034320
+User’s Name: Austin Gordon
+Dealership Name: Hutson, Inc.
+File Name: phase1b-anvil-only-match
+Count of records in the file (not including the header row): 12818
+Count of duplicate records in the file: 0
+Count of records that already have a customer linkage established: 7
+Count of records that received a tight match: 8173
+Count of records that received a potential match: 3872
+Count of records with no match: 277
+Count of records with error: 489
+
+Log into the Customer Linkage application to review the records and create linkages.For more information, please read the help document located on the Upload tab.
+
+URL to Customer Linkage application: https://customerlinkage.deere.com
+
+Regards,
+Customer Linkage Team
+
+PS- Some of the unique errors in File:
+
+DBS Customer Number	Error
+ARABUCKIC46995	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALANJACC7267	Country code is blank. Please provide a valid 2 character ISO Country Code.
+BIDDLECAC27656	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALPINEHC191	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALBERTBC945	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALANSCOC11424	Country code is blank. Please provide a valid 2 character ISO Country Code.
+AhernKC36699	Country code is blank. Please provide a valid 2 character ISO Country Code.
+BARGEONC3513	Country code is blank. Please provide a valid 2 character ISO Country Code.
+BARBARAC8823	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALOHASTC160	Country code is blank. Please provide a valid 2 character ISO Country Code.
+AWADAMC3161	Country code is blank. Please provide a valid 2 character ISO Country Code.
+AllenPaC37	Country code is blank. Please provide a valid 2 character ISO Country Code.
+BEARDSLEC29811	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALLENPAC11972	Country code is blank. Please provide a valid 2 character ISO Country Code.
+AAFAC5	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ABCLANDC19	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ANDERSONC44439	Country code is blank. Please provide a valid 2 character ISO Country Code.
+BETTENDOC3104	Country code is blank. Please provide a valid 2 character ISO Country Code.
+BILLANC611319	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ANDERSONC962	Country code is blank. Please provide a valid 2 character ISO Country Code.
+ALBERSSTC3270	Country code is blank. Please provide a valid 2 character ISO Country Code.
