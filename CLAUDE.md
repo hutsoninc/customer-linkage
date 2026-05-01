@@ -13,6 +13,7 @@ Formal linkage between EQUIP (dealer DBS) contacts and John Deere's Customer Reg
 | `docs/data-model.md` | ERD, table relationships, field semantics |
 | `docs/dataset-equip-contact.md` | Equip.contact column reference + upload template mapping |
 | `docs/source-materials-summary.md` | Consolidated Deere reference documents |
+| `docs/data-quality-plan.md` | Data quality reporting plan — metrics, snapshot architecture, Power BI structure, open questions |
 
 ## Directory Structure
 
