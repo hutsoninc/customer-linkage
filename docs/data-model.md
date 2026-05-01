@@ -38,6 +38,7 @@ erDiagram
         int     contact_id              "Registry Contact ID"
         string  out_of_busn_ind         "Y/N"
         string  descd_ind               "Y/N"
+        string  cross_ref_description       "Source of the linkage — filter required (see below)"
     }
 
     Salesforce_Account {
@@ -66,7 +67,7 @@ erDiagram
 | EQUIP_contact → DDP_customer_cross_ref | **1:0..1** | A contact may or may not be formally linked. Each contact_code appears at most once in cross_ref. |
 | EQUIP_contact → EQUIP_WKMECHFL | **1:0..1** | 1,787 technician records; 1,768 (99%) join to a contact. `Code` = contact_code. Exclude from all upload queries. |
 | EQUIP_contact → EQUIP_VhSalman | **1:0..1** | 2,468 salesperson records; 2,435 (99%) join to a contact. `CODE` = contact_code. Exclude from all upload queries. |
-| DDP_customer_cross_ref → DDP_customer_profile | **N:1** | Multiple EQUIP contacts can link to the same Registry entity (603 cases confirmed — these are duplicates in EQUIP). |
+| DDP_customer_cross_ref → DDP_customer_profile | **N:1** | Multiple EQUIP contacts can link to the same Registry entity (603 cases confirmed — these are duplicates in EQUIP). `customer_profile` rows are also keyed by `cross_ref_description` — always filter to `'HUTSON INC Dealer XREF'` to avoid duplicate rows from EDA source (see convention rule 12). |
 | EQUIP_ArMaster → Salesforce_Account | **1:0..1** | Salesforce Customer records sync from EQUIP. Not all EQUIP accounts have a Salesforce record. Prospect accounts have no account number and no EQUIP record. |
 
 ---
@@ -108,6 +109,19 @@ Registry
 
 This is why `EQUIP_contact` type-C records have `Ckc_Id` = parent Business Entity ID:
 they share that Entity ID with the Business record in Registry.
+
+---
+
+## DDP.customer_profile — cross_ref_description Values
+
+As of 2026-05-01, John Deere added a `cross_ref_description` field to `DDP.customer_profile`. The field identifies the source system that created the linkage. Known values:
+
+| Value | Source | Notes |
+|---|---|---|
+| `HUTSON INC Dealer XREF` | EQUIP → Registry (this project) | Hutson's formal dealer cross-references |
+| `EDA UCC-1 BUYERS` | EDA dataset (edadata.com) | New as of 2026-05-01; EDA not yet loaded in Fabric |
+
+**Query impact:** Without filtering on `cross_ref_description`, the same entity_id + contact_id row appears twice — once per source. All joins to `customer_profile` must filter on `cross_ref_description = 'HUTSON INC Dealer XREF'` to prevent fan-out (see query convention rule 12).
 
 ---
 

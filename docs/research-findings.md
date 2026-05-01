@@ -721,19 +721,19 @@ Three distinct mechanisms exist for moving data between EQUIP and Registry. They
 
 The Help Document is explicit: *"The linkage does not sync data between systems — it simply establishes that a DBS contact and a Registry entity are the same customer. Data differences between the two records are acceptable."*
 
-Entity ID write-back IS documented: *"EQUIP dealers: linkages created in Registry via the tool are sent to EQUIP overnight."* This is consistent with the no-overwrite hypothesis — the tool writes the entity ID back to EQUIP, but only when the field is blank.
+Entity ID write-back IS documented: *"EQUIP dealers: linkages created in Registry via the tool are sent to EQUIP overnight."*
 
 **Screenshot observation (Equip Contact Information Search Screen.png):** WILSONSOAK71156 was opened in Contact Code Maintenance. The Contact Information Search popup pre-populated with the existing `Ckc_Id = 349494940` and returned no results — because that entity no longer exists as a primary entity in Registry (it merged into `321788532`). A user trying to fix this manually would need to clear the entity ID field, search by name, find `321788532`, select the correct BC row (contact `328618610` — BENJAMIN WILSON), and click Update. This is a non-obvious manual remediation step for stale merged entity IDs.
 
-**Important operational note — EQUIP entity ID write-back behavior is unconfirmed:** After the test upload, EQUIP still shows the pre-merge values on WILSONSOAK71156 (`Ckc_Id = 349494940`, `Cmp_Ckc_Id = 328618610`), not the merged entity ID (`321788532`) that the tool actually linked to.
+**EQUIP write-back behavior — CONFIRMED (2026-04-30):** After the Phase 1.1 test upload, EQUIP updated overnight:
 
-Two possible explanations:
-- **One-directional:** The tool writes to Registry/`customer_cross_ref` only and never updates EQUIP.
-- **Conditional write-back:** The tool does write back to EQUIP but only when the field is blank — it won't overwrite an existing `Ckc_Id`. WILSONSOAK71156 already had a value so it was skipped; a record with a null `Ckc_Id` might get populated.
+- **Entity ID write-back confirmed** — `Ckc_Id` was updated to the surviving merged entity ID.
+- **Contact ID preserved, not zeroed** — `Cmp_Ckc_Id` (328618610) was retained in EQUIP even though the tool returned `Contact ID = 0` in the "Merged Contact ID that was linked" column. The tool does not zero out an existing contact ID during write-back.
+- **Likely no-overwrite rule** — the tool appears to write entity/contact IDs back to EQUIP but will not overwrite a field that already has a value with a lower-confidence value (e.g., 0). If the contact itself were reassigned to a different contact ID in the Registry, it's possible that ID would be written back.
 
-**Test opportunity — Phase 1.2:** The 12,818 Phase 1.2 records have `Ckc_Id = NULL` in EQUIP (confirmed by `H_Equip_contact_Ckc_Id__c` being null in Salesforce, which is synced from EQUIP). After the Phase 1.2 Path B upload and linkage creation, check whether `Ckc_Id` was populated in EQUIP on the linked records. See `queries/phase-1/block-7c.sql` for the post-upload validation query. If EQUIP is updated for those records, the tool is bidirectional with a no-overwrite rule. If not, it is strictly one-directional.
+**Implication for merged entity records:** The 5 Phase 1.1 records that linked to a merged entity (WILSONSOAK71156 and peers) will have their EQUIP `Ckc_Id` corrected to the surviving entity overnight. The contact ID will be preserved as-is rather than cleared. This is the correct behavior for our use case — no manual remediation needed for these records.
 
-If the tool is one-directional (or no-overwrite), options for correcting stale `Ckc_Id` values: manual correction in EQUIP Contact Maintenance, a ticket to JDIS or the Customer Linkage team, or accepting `customer_cross_ref` as authoritative. This will recur at scale in Phases 1.2 and 3 wherever Registry has merged entities.
+**Phase 1.2 follow-up:** Run `queries/phase-1/block-7c.sql` after Phase 1.2 upload and overnight sync to confirm `Ckc_Id` was populated on the null-`Ckc_Id` records. That will confirm the write-back also fires for records with no prior value.
 
 ---
 

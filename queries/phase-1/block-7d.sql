@@ -29,8 +29,9 @@ JOIN Equip.contact c
 LEFT JOIN Equip.WKMECHFL m ON m.Code = c.contact_code
 LEFT JOIN Equip.VhSalman s ON s.CODE = c.contact_code
 LEFT JOIN DDP.customer_profile cp
-    ON cp.entity_id  = sf.Anvil__CustomerCompEntityID__c
-    AND cp.contact_id = 0
+    ON cp.entity_id              = sf.Anvil__CustomerCompEntityID__c
+    AND cp.contact_id            = 0
+    AND cp.cross_ref_description = 'HUTSON INC Dealer XREF'
 WHERE sf.RecordTypeId = '0124W000001aGwlQAE'
   AND sf.Anvil__CustomerCompEntityID__c IS NOT NULL
   AND sf.H_Equip_contact_Ckc_Id__c IS NULL

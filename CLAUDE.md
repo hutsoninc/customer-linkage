@@ -54,6 +54,7 @@ Full patterns with examples in `docs/query-conventions.md`. Summary:
 3. **Country code** — `ISNULL(NULLIF(LTRIM(RTRIM(c.country)), ''), 'US')` (handles empty string AND null)
 4. **Inactive filter** — `ISNULL(c.Inactive_Indicator, 'A') <> 'I'`
 5. **Sentinel entity ID** — exclude `Ckc_Id = 999999998`
+6. **customer_profile filter** — always add `AND cp.cross_ref_description = 'HUTSON INC Dealer XREF'` to every `DDP.customer_profile` join (new as of 2026-05-01; EDA rows cause fan-out without this)
 
 ## Data Model (5 tables, 3 systems)
 

@@ -145,3 +145,27 @@ See `queries/phase-1/block-7d.sql` for the full Phase 1.2 population check.
 `Equip.contact` includes service technicians (`Equip.WKMECHFL`, `Code` column) and salespersons (`Equip.VhSalman`, `CODE` column). Both join 1:1 to `contact_code`. Exclude regardless of termination status — both tables retain terminated employees.
 
 This exclusion must be in **every** query that produces an upload file or counts upload candidates. See also Rule 3 for the full pattern.
+
+---
+
+## 12. customer_profile Join — Always Filter on cross_ref_description
+
+As of 2026-05-01, `DDP.customer_profile` has a `cross_ref_description` column. The same entity_id + contact_id pair now appears in multiple rows — one per source system. Without the filter, joins fan out and produce duplicate rows.
+
+Known values: `'HUTSON INC Dealer XREF'` (our linkages) and `'EDA UCC-1 BUYERS'` (EDA dataset, edadata.com — not yet in Fabric).
+
+Always add `cross_ref_description = 'HUTSON INC Dealer XREF'` to every join to `DDP.customer_profile`:
+
+```sql
+-- Entity-level health check (contact_id = 0 = entity row)
+LEFT JOIN DDP.customer_profile cp
+    ON cp.entity_id              = <entity_id_column>
+    AND cp.contact_id            = 0
+    AND cp.cross_ref_description = 'HUTSON INC Dealer XREF'
+
+-- Contact-level join (C-type records)
+LEFT JOIN DDP.customer_profile cp
+    ON cp.entity_id              = <entity_id_column>
+    AND cp.contact_id            = <contact_id_column>
+    AND cp.cross_ref_description = 'HUTSON INC Dealer XREF'
+```

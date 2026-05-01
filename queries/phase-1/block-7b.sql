@@ -44,9 +44,11 @@ SELECT
 
 FROM phase1a p
 LEFT JOIN DDP.customer_profile cp_ent
-    ON cp_ent.entity_id = p.entity_id
-    AND cp_ent.contact_id = 0
+    ON cp_ent.entity_id              = p.entity_id
+    AND cp_ent.contact_id            = 0
+    AND cp_ent.cross_ref_description = 'HUTSON INC Dealer XREF'
 LEFT JOIN DDP.customer_profile cp_con
-    ON cp_con.entity_id = p.entity_id
-    AND cp_con.contact_id = p.contact_id
+    ON cp_con.entity_id              = p.entity_id
+    AND cp_con.contact_id            = p.contact_id
+    AND cp_con.cross_ref_description = 'HUTSON INC Dealer XREF'
 ORDER BY entity_in_registry DESC, contact_in_registry DESC, p.contact_code
