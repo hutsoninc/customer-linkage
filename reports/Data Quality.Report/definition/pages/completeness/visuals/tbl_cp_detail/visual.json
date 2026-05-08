@@ -1,0 +1,151 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.8.0/schema.json",
+  "name": "tbl_cp_detail",
+  "position": {
+    "x": 840,
+    "y": 200,
+    "z": 6000,
+    "height": 500,
+    "width": 410,
+    "tabOrder": 6000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "metric_name"
+                }
+              },
+              "queryRef": "data_quality_snapshot.metric_name",
+              "nativeQueryRef": "metric_name"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "contact_type"
+                }
+              },
+              "queryRef": "data_quality_snapshot.contact_type",
+              "nativeQueryRef": "contact_type"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "numerator"
+                }
+              },
+              "queryRef": "data_quality_snapshot.numerator",
+              "nativeQueryRef": "numerator"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "denominator"
+                }
+              },
+              "queryRef": "data_quality_snapshot.denominator",
+              "nativeQueryRef": "denominator"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "metric_name"
+                }
+              },
+              "queryRef": "data_quality_snapshot.metric_name",
+              "nativeQueryRef": "metric_name"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "contact_type"
+                }
+              },
+              "queryRef": "data_quality_snapshot.contact_type",
+              "nativeQueryRef": "contact_type"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "Issue Count"
+                }
+              },
+              "queryRef": "data_quality_snapshot.Issue Count",
+              "nativeQueryRef": "Issue Count"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "Record Count"
+                }
+              },
+              "queryRef": "data_quality_snapshot.Record Count",
+              "nativeQueryRef": "Record Count"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Completeness Detail'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

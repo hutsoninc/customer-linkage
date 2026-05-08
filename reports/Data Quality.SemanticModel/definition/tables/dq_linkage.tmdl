@@ -1,0 +1,217 @@
+table dq_linkage
+	lineageTag: 73fb3e64-aca7-43ba-be9a-ebb1cac20af9
+
+	column snapshot_date
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 28d82061-e0a2-43c2-8194-163fad69a026
+		summarizeBy: none
+		sourceColumn: snapshot_date
+
+		variation Variation
+			isDefault
+			relationship: 06f2467f-9f32-465d-b573-1840806ff1ad
+			defaultHierarchy: LocalDateTable_1887c173-2178-4b86-9599-6a3d99e5512e.'Date Hierarchy'
+
+		annotation SummarizationSetBy = Automatic
+
+	column metric_category
+		dataType: string
+		lineageTag: d25c242e-cc80-45d9-94d6-5bc1e4f85138
+		summarizeBy: none
+		sourceColumn: metric_category
+
+		annotation SummarizationSetBy = Automatic
+
+	column metric_name
+		dataType: string
+		lineageTag: 7d673977-28ff-410f-892d-0ed0ef31795d
+		summarizeBy: none
+		sourceColumn: metric_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column contact_type
+		dataType: string
+		lineageTag: 5bdd8bc3-b2f9-414a-9f13-cdc26acf5b48
+		summarizeBy: none
+		sourceColumn: contact_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column sales_decile
+		dataType: string
+		lineageTag: c4c4fd04-498e-4f8c-a023-cd86e02cb300
+		summarizeBy: none
+		sourceColumn: sales_decile
+
+		annotation SummarizationSetBy = Automatic
+
+	column staleness_bucket
+		dataType: string
+		lineageTag: 1ac719cc-f15d-4ea3-b8b8-e0540d26de24
+		summarizeBy: none
+		sourceColumn: staleness_bucket
+
+		annotation SummarizationSetBy = Automatic
+
+	column branch
+		dataType: string
+		lineageTag: 05dff804-d631-4b91-8ee7-068d24ff06cc
+		summarizeBy: none
+		sourceColumn: branch
+
+		annotation SummarizationSetBy = Automatic
+
+	column creation_cohort
+		dataType: string
+		lineageTag: 75626456-9ca8-4e23-97cb-07108f6bacaf
+		summarizeBy: none
+		sourceColumn: creation_cohort
+
+		annotation SummarizationSetBy = Automatic
+
+	column numerator
+		dataType: int64
+		formatString: 0
+		lineageTag: a2f307a8-ff2a-4bb3-9c1b-07063fbd8586
+		summarizeBy: sum
+		sourceColumn: numerator
+
+		annotation SummarizationSetBy = Automatic
+
+	column denominator
+		dataType: int64
+		formatString: 0
+		lineageTag: 93a1f473-0176-45c9-bc07-f80929184b99
+		summarizeBy: sum
+		sourceColumn: denominator
+
+		annotation SummarizationSetBy = Automatic
+
+	partition main = m
+		mode: import
+		source =
+				let
+				    Source = Sql.Database(
+				        "26uvtcjpbewezphfsvea336vji-pzx7gvzmumzubkrzfqlfxchiaa.datawarehouse.fabric.microsoft.com",
+				        "Bronze_Production_Lakehouse",
+				        [CreateNavigationProperties = false]
+				    ),
+				    Result = Value.NativeQuery(
+				        Source,
+				        "
+				WITH active_contacts AS (
+				    SELECT
+				        c.contact_code,
+				        c.Business_Individual,
+				        c.Ckc_Id,
+				        CASE
+				            WHEN c.Creation_Date IS NULL              THEN 'Unknown'
+				            WHEN YEAR(c.Creation_Date) < 2015         THEN 'Pre-2015'
+				            WHEN YEAR(c.Creation_Date) < 2020         THEN '2015-2020'
+				            WHEN YEAR(c.Creation_Date) < 2025         THEN '2020-2025'
+				            ELSE                                           '2025+'
+				        END AS creation_cohort
+				    FROM [Bronze_Production_Lakehouse].[Equip].[contact] c
+				        LEFT JOIN [Bronze_Production_Lakehouse].[Equip].[WKMECHFL] wk
+				            ON wk.[Code] = c.contact_code
+				        LEFT JOIN [Bronze_Production_Lakehouse].[Equip].[VhSalman] vs
+				            ON vs.[CODE] = c.contact_code
+				    WHERE ISNULL(c.Inactive_Indicator, 'A') <> 'I'
+				      AND wk.[Code] IS NULL
+				      AND vs.[CODE] IS NULL
+				),
+				contact_linkage AS (
+				    SELECT
+				        ac.contact_code,
+				        ac.Business_Individual,
+				        ac.Ckc_Id,
+				        ac.creation_cohort,
+				        xr.entity_id,
+				        xr.contact_id,
+				        CASE WHEN xr.cross_ref_number IS NOT NULL THEN 1 ELSE 0 END AS is_linked
+				    FROM active_contacts ac
+				        LEFT JOIN [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref] xr
+				            ON UPPER(xr.cross_ref_number) = UPPER(ac.contact_code)
+				           AND xr.entity_id <> 999999998
+				)
+				SELECT
+				    CAST(GETDATE() AS date) AS snapshot_date,
+				    'linkage'               AS metric_category,
+				    'linked_count'          AS metric_name,
+				    Business_Individual     AS contact_type,
+				    'ALL'                   AS sales_decile,
+				    'ALL'                   AS staleness_bucket,
+				    'ALL'                   AS branch,
+				    creation_cohort,
+				    SUM(is_linked)          AS numerator,
+				    COUNT(*)                AS denominator
+				FROM contact_linkage
+				GROUP BY Business_Individual, creation_cohort
+				UNION ALL
+				SELECT
+				    CAST(GETDATE() AS date), 'linkage', 'unlinked_count',
+				    Business_Individual, 'ALL', 'ALL', 'ALL', creation_cohort,
+				    SUM(1 - is_linked), COUNT(*)
+				FROM contact_linkage
+				GROUP BY Business_Individual, creation_cohort
+				UNION ALL
+				SELECT
+				    CAST(GETDATE() AS date), 'linkage', 'ckc_id_no_cross_ref',
+				    Business_Individual, 'ALL', 'ALL', 'ALL', creation_cohort,
+				    SUM(CASE WHEN Ckc_Id IS NOT NULL AND is_linked = 0 THEN 1 ELSE 0 END),
+				    SUM(CASE WHEN Ckc_Id IS NOT NULL THEN 1 ELSE 0 END)
+				FROM contact_linkage
+				GROUP BY Business_Individual, creation_cohort
+				UNION ALL
+				SELECT
+				    CAST(GETDATE() AS date), 'linkage', 'type_mismatch_linkage',
+				    Business_Individual, 'ALL', 'ALL', 'ALL', creation_cohort,
+				    SUM(CASE
+				        WHEN Business_Individual = 'C'         AND contact_id <> 0 THEN 1
+				        WHEN Business_Individual IN ('B', 'I') AND contact_id  = 0 THEN 1
+				        ELSE 0
+				    END),
+				    SUM(is_linked)
+				FROM contact_linkage
+				WHERE is_linked = 1
+				GROUP BY Business_Individual, creation_cohort
+				UNION ALL
+				SELECT
+				    CAST(GETDATE() AS date), 'linkage', 'duplicate_entity_id',
+				    'ALL', 'ALL', 'ALL', 'ALL', 'ALL',
+				    COUNT(*),
+				    (SELECT COUNT(*) FROM active_contacts)
+				FROM (
+				    SELECT entity_id
+				    FROM contact_linkage
+				    WHERE is_linked = 1
+				    GROUP BY entity_id
+				    HAVING COUNT(*) > 1
+				) dups
+				UNION ALL
+				SELECT
+				    CAST(GETDATE() AS date), 'linkage', 'orphan_cross_ref',
+				    'ALL', 'ALL', 'ALL', 'ALL', 'ALL',
+				    COUNT(*),
+				    (SELECT COUNT(*) FROM [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref]
+				     WHERE entity_id <> 999999998)
+				FROM [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref] xr_all
+				WHERE xr_all.entity_id <> 999999998
+				  AND NOT EXISTS (
+				      SELECT 1
+				      FROM active_contacts ac
+				      WHERE UPPER(ac.contact_code) = UPPER(xr_all.cross_ref_number)
+				  )
+				",
+				        null,
+				        [EnableFolding = false]
+				    )
+				in
+				    Result
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

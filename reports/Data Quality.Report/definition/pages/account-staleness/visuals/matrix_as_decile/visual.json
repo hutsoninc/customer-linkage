@@ -1,0 +1,87 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.8.0/schema.json",
+  "name": "matrix_as_decile",
+  "position": {
+    "x": 720,
+    "y": 200,
+    "z": 6000,
+    "height": 420,
+    "width": 530,
+    "tabOrder": 6000
+  },
+  "visual": {
+    "visualType": "pivotTable",
+    "query": {
+      "queryState": {
+        "Rows": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "metric_name"
+                }
+              },
+              "queryRef": "data_quality_snapshot.metric_name",
+              "nativeQueryRef": "metric_name",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "sales_decile"
+                }
+              },
+              "queryRef": "data_quality_snapshot.sales_decile",
+              "nativeQueryRef": "sales_decile",
+              "active": true
+            }
+          ]
+        },
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "numerator"
+                }
+              },
+              "queryRef": "data_quality_snapshot.numerator",
+              "nativeQueryRef": "numerator"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Staleness x Sales Decile'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

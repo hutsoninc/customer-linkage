@@ -1,0 +1,23 @@
+﻿TABLE NAME (double click the row to expand/collapse information),COL_NAME,LENGTH,COL_TYPE,Primary Key,NULLS_ALLOWED,REMARKS
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,ACC_TYPE,1,char,N,Y,"Parts & Service Customers (default/recommened) , Vehicle Account type, Contract Customer, Trust Account"
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,alert,4000,varchar,N,Y,Information entered in this field will load SysNotes when the customer is selected
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,allow_trans_no_cc,1,char,N,Y,To Allow Credit Card Transaction
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,attachments,4000,varchar,N,Y,The file location and file name of any files attached to the customer
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,BILL_TO_ACC,4,integer,N,N,The customer Number to which all transactions update. Defaults to customer number.
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,capricorn_number,6,numeric,N,Y,A unique ID given by the Capricorn Society
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,CONTACT_CODE,15,char,N,N,Customer's Contact Code
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,CreationDate,8,timestamp,N,Y,Account Receivable Customer Created Timestamp
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,Customer_No,4,integer,N,Y,"An alternate reference number for the customer, else defaults to the customer number"
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,DISC_TYPE,2,char,N,Y,Discount class for use with Special Pricing Parts
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,LABOUR_RATE,12,numeric,N,Y,"If a standard Service (Service (workshop)) Labor Rate is to be charged to the customer, enter the hourly rate."
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,ModifiedDate,8,timestamp,N,Y,Account Receivable Customer Modified Timestamp
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,NOTE,32767,varchar,N,Y,Notes and description relating to the customer
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,PRICE_LEVEL,1,char,N,Y,"Set the default price level for the customer. 1, 2, 3, 4, Cost Price, List Price"
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,PRICE_PERCENT,6,numeric,N,Y,Any percentage value entered in this field will increase the standard parts Price Level. A negative value will apply a discount to the customer.
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,QUOTE_PURCH_ORD,1,char,N,Y,If Y an order number will be required by the customer for Parts/Service (workshop) sales.
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,STATUS_CODE,1,char,N,Y,Customer's Status Code - These codes are set inType Code Maintenance - Code SC
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,TAX_EXEMPT_NO,16,char,N,Y,"If a customer, of any type, wishes to purchase goods or a stock unit tax free, their Tax Exemption Number must be entered in this field."
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,Tax_Exempt_Type,15,char,N,Y,Tax Exempt Types - These codes are set inType Code Maintenance - Code ??? (need to look up)
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,TERRITORY,3,char,N,Y,An optional user defined field. This may be used to generate reports for delivery or salesperson analysis.
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,TRADE_TYPE,1,char,N,Y,"Sets the customer's level for marketing and data sorting purposes: Cash, Dealer, Internal, Retail, Trade or Warranty"
+ArMaster_Customer  -Financial- Customers (Debtors) Business Rules,customer_no_char,15,char,N,Y,Computed column for character datatype to avoid casting of customer_no column

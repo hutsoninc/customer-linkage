@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.8.0/schema.json",
+  "name": "slicer_tr_category",
+  "position": {
+    "x": 10,
+    "y": 10,
+    "z": 0,
+    "height": 50,
+    "width": 300,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "metric_category"
+                }
+              },
+              "queryRef": "data_quality_snapshot.metric_category",
+              "nativeQueryRef": "metric_category",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

@@ -1,0 +1,367 @@
+table dq_field_quality
+	lineageTag: 9595e529-c04d-4753-a103-145d219865c2
+
+	column snapshot_date
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 839351a7-d786-4324-ba40-b92ad55e5b87
+		summarizeBy: none
+		sourceColumn: snapshot_date
+
+		variation Variation
+			isDefault
+			relationship: 8a11074a-9ca0-4d0c-b2d5-5698e80ef9f9
+			defaultHierarchy: LocalDateTable_d74030c3-2e3a-434d-b21f-8f43a7c03a55.'Date Hierarchy'
+
+		annotation SummarizationSetBy = Automatic
+
+	column metric_category
+		dataType: string
+		lineageTag: 686d365f-3cbd-49ce-b73e-f26db3d1dc23
+		summarizeBy: none
+		sourceColumn: metric_category
+
+		annotation SummarizationSetBy = Automatic
+
+	column metric_name
+		dataType: string
+		lineageTag: 210d59bf-04fe-4196-b0cf-0e14cdfbbc30
+		summarizeBy: none
+		sourceColumn: metric_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column contact_type
+		dataType: string
+		lineageTag: 510e4a20-cd1f-4aec-857b-f930fd60a0d2
+		summarizeBy: none
+		sourceColumn: contact_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column sales_decile
+		dataType: string
+		lineageTag: 63539852-fcbb-487b-a11f-6e954051221c
+		summarizeBy: none
+		sourceColumn: sales_decile
+
+		annotation SummarizationSetBy = Automatic
+
+	column staleness_bucket
+		dataType: string
+		lineageTag: fa80ffb3-52e5-49af-8c5f-44b62d25575e
+		summarizeBy: none
+		sourceColumn: staleness_bucket
+
+		annotation SummarizationSetBy = Automatic
+
+	column branch
+		dataType: string
+		lineageTag: 10ed239e-0bd1-4ecc-9bfd-68ce18055650
+		summarizeBy: none
+		sourceColumn: branch
+
+		annotation SummarizationSetBy = Automatic
+
+	column creation_cohort
+		dataType: string
+		lineageTag: e0bb10b7-0694-4e20-92b3-660d382f88b4
+		summarizeBy: none
+		sourceColumn: creation_cohort
+
+		annotation SummarizationSetBy = Automatic
+
+	column numerator
+		dataType: int64
+		formatString: 0
+		lineageTag: 213498ef-2fa4-4cda-b42c-e9de24c97b4f
+		summarizeBy: sum
+		sourceColumn: numerator
+
+		annotation SummarizationSetBy = Automatic
+
+	column denominator
+		dataType: int64
+		formatString: 0
+		lineageTag: 68a2eb47-033c-4628-92d2-fb182c1f71e9
+		summarizeBy: sum
+		sourceColumn: denominator
+
+		annotation SummarizationSetBy = Automatic
+
+	partition main = m
+		mode: import
+		source =
+				let
+				    Source = Sql.Database(
+				        "26uvtcjpbewezphfsvea336vji-pzx7gvzmumzubkrzfqlfxchiaa.datawarehouse.fabric.microsoft.com",
+				        "Bronze_Production_Lakehouse",
+				        [CreateNavigationProperties = false]
+				    ),
+				    Result = Value.NativeQuery(
+				        Source,
+				        "
+				WITH active_contacts AS (
+				    SELECT
+				        c.contact_code,
+				        c.Business_Individual,
+				        c.[name],
+				        c.surname,
+				        c.company_name,
+				        c.street,
+				        c.city,
+				        c.state,
+				        c.pcode,
+				        c.country,
+				        c.BusinessPhone,
+				        c.PrivatePhone,
+				        c.MobilePhone,
+				        c.email_address,
+				        c.title,
+				        c.Generation,
+				        c.Suffix,
+				        CASE
+				            WHEN c.Creation_Date IS NULL              THEN 'Unknown'
+				            WHEN YEAR(c.Creation_Date) < 2015         THEN 'Pre-2015'
+				            WHEN YEAR(c.Creation_Date) < 2020         THEN '2015-2020'
+				            WHEN YEAR(c.Creation_Date) < 2025         THEN '2020-2025'
+				            ELSE                                           '2025+'
+				        END AS creation_cohort
+				    FROM [Bronze_Production_Lakehouse].[Equip].[contact] c
+				        LEFT JOIN [Bronze_Production_Lakehouse].[Equip].[WKMECHFL] wk
+				            ON wk.[Code] = c.contact_code
+				        LEFT JOIN [Bronze_Production_Lakehouse].[Equip].[VhSalman] vs
+				            ON vs.[CODE] = c.contact_code
+				    WHERE ISNULL(c.Inactive_Indicator, 'A') <> 'I'
+				      AND wk.[Code] IS NULL
+				      AND vs.[CODE] IS NULL
+				)
+				SELECT
+				    CAST(GETDATE() AS date) AS snapshot_date,
+				    'field_quality'         AS metric_category,
+				    metric_name,
+				    contact_type,
+				    'ALL'                   AS sales_decile,
+				    'ALL'                   AS staleness_bucket,
+				    'ALL'                   AS branch,
+				    creation_cohort,
+				    SUM(is_flagged)         AS numerator,
+				    COUNT(*)                AS denominator
+				FROM (
+				    SELECT '4a_status_text_in_name' AS metric_name, Business_Individual AS contact_type,
+				           creation_cohort,
+				           CASE
+				               WHEN [name]  LIKE '%DECEASED%' OR [name]  LIKE '%OUT OF BUSINESS%'
+				                         OR [name]  LIKE '%DO NOT USE%' OR [name]  LIKE '%INACTIVE%'
+				                         OR [name]  LIKE '%CLOSED%'
+				                 OR surname LIKE '%DECEASED%' OR surname LIKE '%OUT OF BUSINESS%'
+				                         OR surname LIKE '%DO NOT USE%' OR surname LIKE '%INACTIVE%'
+				                         OR surname LIKE '%CLOSED%'
+				               THEN 1 ELSE 0
+				           END AS is_flagged
+				    FROM active_contacts WHERE Business_Individual IN ('I', 'C')
+				    UNION ALL
+				    SELECT '4a_status_text_in_company', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN company_name LIKE '%DECEASED%'       OR company_name LIKE '%OUT OF BUSINESS%'
+				                 OR company_name LIKE '% OOB %'          OR company_name LIKE '%DO NOT USE%'
+				                 OR company_name LIKE '%INACTIVE%'        OR company_name LIKE '%CLOSED%'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE Business_Individual = 'B'
+				    UNION ALL
+				    SELECT '4a_status_text_in_street', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN street LIKE '%DECEASED%'     OR street LIKE '%OUT OF BUSINESS%'
+				                 OR street LIKE '%DO NOT USE%'   OR street LIKE '%INACTIVE%'
+				                 OR street LIKE '%CLOSED%'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts
+				    UNION ALL
+				    SELECT '4b_dba_in_company_name', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN company_name LIKE '%DBA %'
+				                 OR company_name LIKE '%D/B/A%'
+				                 OR company_name LIKE '%DOING BUSINESS AS%'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE Business_Individual = 'B'
+				    UNION ALL
+				    SELECT '4c_prefix_in_name', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN [name] LIKE 'MR.%'   OR [name] LIKE 'MR %'
+				                 OR [name] LIKE 'MRS.%'  OR [name] LIKE 'MRS %'
+				                 OR [name] LIKE 'MS.%'   OR [name] LIKE 'MS %'
+				                 OR [name] LIKE 'DR.%'   OR [name] LIKE 'DR %'
+				                 OR [name] LIKE 'REV.%'  OR [name] LIKE 'REV %'
+				                 OR [name] LIKE 'PROF.%' OR [name] LIKE 'PROF %'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE Business_Individual IN ('I', 'C')
+				    UNION ALL
+				    SELECT '4c_suffix_in_surname', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN surname LIKE '% JR'   OR surname LIKE '% JR.'
+				                 OR surname LIKE '% SR'   OR surname LIKE '% SR.'
+				                 OR surname LIKE '% II'   OR surname LIKE '% III'
+				                 OR surname LIKE '% IV'   OR surname LIKE '% V'
+				                 OR surname LIKE '% MD'   OR surname LIKE '% PHD'
+				                 OR surname LIKE '% CPA'  OR surname LIKE '% ESQ'
+				                 OR surname LIKE '% DDS'  OR surname LIKE '% DO'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE Business_Individual IN ('I', 'C')
+				    UNION ALL
+				    SELECT '4c_combined_names_in_name', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN [name] LIKE '%&%'
+				                 OR [name] LIKE '% AND %'
+				                 OR [name] LIKE '%/%'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE Business_Individual IN ('I', 'C')
+				    UNION ALL
+				    SELECT '4c_familiar_name_pattern', Business_Individual, creation_cohort,
+				           CASE WHEN [name] LIKE '%(%)%' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE Business_Individual IN ('I', 'C')
+				    UNION ALL
+				    SELECT '4d_email_invalid_format', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN NULLIF(LTRIM(RTRIM(email_address)), '') IS NOT NULL
+				                AND email_address NOT LIKE '%@%.%'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts
+				    UNION ALL
+				    SELECT '4d_email_placeholder', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN LOWER(email_address) LIKE 'noemail@%'
+				                 OR LOWER(email_address) LIKE 'test@test%'
+				                 OR LOWER(email_address) LIKE 'none@none%'
+				                 OR LOWER(email_address) LIKE 'nomail@%'
+				                 OR LOWER(email_address) LIKE 'donotcontact@%'
+				                 OR LOWER(email_address) LIKE 'noreply@%'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(email_address)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4d_email_internal_deere', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN email_address LIKE '%@deere.com'
+				                 OR email_address LIKE '%@johndeere.com'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(email_address)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_biz_phone_allzeros', Business_Individual, creation_cohort,
+				           CASE WHEN BusinessPhone = '0000000000' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(BusinessPhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_biz_phone_sequential', Business_Individual, creation_cohort,
+				           CASE WHEN BusinessPhone = '1234567890' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(BusinessPhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_biz_phone_repeated_digit', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN LEN(BusinessPhone) = 10
+				                AND BusinessPhone = REPLICATE(LEFT(BusinessPhone, 1), 10)
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(BusinessPhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_biz_phone_wrong_length', Business_Individual, creation_cohort,
+				           CASE WHEN LEN(LTRIM(RTRIM(BusinessPhone))) NOT IN (10, 11) THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(BusinessPhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_priv_phone_allzeros', Business_Individual, creation_cohort,
+				           CASE WHEN PrivatePhone = '0000000000' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(PrivatePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_priv_phone_sequential', Business_Individual, creation_cohort,
+				           CASE WHEN PrivatePhone = '1234567890' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(PrivatePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_priv_phone_repeated_digit', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN LEN(PrivatePhone) = 10
+				                AND PrivatePhone = REPLICATE(LEFT(PrivatePhone, 1), 10)
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(PrivatePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_priv_phone_wrong_length', Business_Individual, creation_cohort,
+				           CASE WHEN LEN(LTRIM(RTRIM(PrivatePhone))) NOT IN (10, 11) THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(PrivatePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_mob_phone_allzeros', Business_Individual, creation_cohort,
+				           CASE WHEN MobilePhone = '0000000000' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(MobilePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_mob_phone_sequential', Business_Individual, creation_cohort,
+				           CASE WHEN MobilePhone = '1234567890' THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(MobilePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_mob_phone_repeated_digit', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN LEN(MobilePhone) = 10
+				                AND MobilePhone = REPLICATE(LEFT(MobilePhone, 1), 10)
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(MobilePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4e_mob_phone_wrong_length', Business_Individual, creation_cohort,
+				           CASE WHEN LEN(LTRIM(RTRIM(MobilePhone))) NOT IN (10, 11) THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(MobilePhone)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4f_state_not_2char', Business_Individual, creation_cohort,
+				           CASE WHEN LEN(LTRIM(RTRIM(state))) <> 2 THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(state)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4f_country_not_2char', Business_Individual, creation_cohort,
+				           CASE WHEN LEN(LTRIM(RTRIM(country))) <> 2 THEN 1 ELSE 0 END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(country)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4f_country_written_out', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN UPPER(LTRIM(RTRIM(country))) IN (
+				                   'UNITED STATES', 'UNITED STATES OF AMERICA', 'USA', 'US OF A',
+				                   'CANADA', 'MEXICO', 'AUSTRALIA', 'NEW ZEALAND'
+				               )
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts WHERE NULLIF(LTRIM(RTRIM(country)), '') IS NOT NULL
+				    UNION ALL
+				    SELECT '4f_zip_not_5digits', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN pcode NOT LIKE '[0-9][0-9][0-9][0-9][0-9]'
+				                AND pcode NOT LIKE '[0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]'
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts
+				    WHERE NULLIF(LTRIM(RTRIM(pcode)), '') IS NOT NULL
+				      AND ISNULL(NULLIF(LTRIM(RTRIM(country)), ''), 'US') = 'US'
+				    UNION ALL
+				    SELECT '4g_generation_unrecognized', Business_Individual, creation_cohort,
+				           CASE
+				               WHEN UPPER(LTRIM(RTRIM(Generation))) NOT IN (
+				                   'JR', 'JR.', 'JUNIOR', 'SR', 'SR.', 'SENIOR', 'II', 'III', 'IV', 'V'
+				               )
+				               THEN 1 ELSE 0
+				           END
+				    FROM active_contacts
+				    WHERE Business_Individual IN ('I', 'C')
+				      AND NULLIF(LTRIM(RTRIM(Generation)), '') IS NOT NULL
+				) m
+				GROUP BY metric_name, contact_type, creation_cohort
+				",
+				        null,
+				        [EnableFolding = false]
+				    )
+				in
+				    Result
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

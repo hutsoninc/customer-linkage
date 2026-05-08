@@ -1,0 +1,30 @@
+relationship 06f2467f-9f32-465d-b573-1840806ff1ad
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dq_linkage.snapshot_date
+	toColumn: LocalDateTable_1887c173-2178-4b86-9599-6a3d99e5512e.Date
+
+relationship 8a11074a-9ca0-4d0c-b2d5-5698e80ef9f9
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dq_field_quality.snapshot_date
+	toColumn: LocalDateTable_d74030c3-2e3a-434d-b21f-8f43a7c03a55.Date
+
+relationship a2808e3a-ede6-439a-99b2-8813f3fd28ee
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dq_staleness.snapshot_date
+	toColumn: LocalDateTable_82289381-218a-452d-9e3e-7db41e738623.Date
+
+relationship 9adb4818-ff20-4d33-8afc-d6c9effbafa9
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dq_match_readiness.snapshot_date
+	toColumn: LocalDateTable_74f0c0fb-7f44-4f88-b414-29e8ac10fd29.Date
+
+relationship 97c31a95-5ac9-41eb-8ed1-ae314069e2cb
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dq_parity.snapshot_date
+	toColumn: LocalDateTable_0b2d0164-b24c-4040-a4c4-0c1fd1805d7d.Date
+
+relationship 97062d00-499f-4b2f-a714-193cb9e5e017
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dq_completeness.snapshot_date
+	toColumn: LocalDateTable_b537b5c9-653b-4bd7-bae4-0861c7c3e571.Date
+

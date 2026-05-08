@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/pagesMetadata/1.0.0/schema.json",
+  "pageOrder": [
+    "executive-summary",
+    "linkage-quality",
+    "completeness",
+    "field-quality",
+    "registry-parity",
+    "account-staleness",
+    "match-readiness",
+    "trends",
+    "d5534a11b55eba25209d"
+  ],
+  "activePageName": "d5534a11b55eba25209d"
+}

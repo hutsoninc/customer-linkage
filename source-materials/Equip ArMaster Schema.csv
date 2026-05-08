@@ -1,0 +1,38 @@
+﻿TABLE NAME (double click the row to expand/collapse information),COL_NAME,LENGTH,COL_TYPE,Primary Key,NULLS_ALLOWED,REMARKS
+ArMaster  -Financial- Customers (Debtors) Master,Acc_No,4,integer,Y,N,Customer's Account Number
+ArMaster  -Financial- Customers (Debtors) Master,BAL_FORWARD,12,numeric,N,Y,The opening balance of the current month
+ArMaster  -Financial- Customers (Debtors) Master,BANK,50,char,N,Y,The name of the customer's financial institution
+ArMaster  -Financial- Customers (Debtors) Master,BANK_ACC,15,char,N,Y,Bank Account Name
+ArMaster  -Financial- Customers (Debtors) Master,BANK_BRANCH,20,char,N,Y,The bank number of the bank/financial institution
+ArMaster  -Financial- Customers (Debtors) Master,CONTACT_CODE,15,char,N,Y,Customer's Contact Code
+ArMaster  -Financial- Customers (Debtors) Master,CreatedBy,20,char,N,Y,Customer Created By User
+ArMaster  -Financial- Customers (Debtors) Master,Creation_Date,8,timestamp,N,Y,Creation Date of the customer record
+ArMaster  -Financial- Customers (Debtors) Master,CREDIT_LIMIT,12,numeric,N,Y,The maximum balance outstanding allowed for the customer's account
+ArMaster  -Financial- Customers (Debtors) Master,CREDIT_MESSAGE,40,char,N,Y,A message relating to the customer. The message can appear on the customer statement print.
+ArMaster  -Financial- Customers (Debtors) Master,CREDIT_STATUS,1,char,N,Y,Record a code representing the status elected for the account - Open or Closed
+ArMaster  -Financial- Customers (Debtors) Master,CREDIT_TERM,1,char,N,Y,"The credit terms agreed to for use and payment of the customer's account: Cash, 30 days, 60 days or 90 days"
+ArMaster  -Financial- Customers (Debtors) Master,CURRENT_VALUE,12,numeric,N,Y,The current amount owing on the account within the accounts credit terms
+ArMaster  -Financial- Customers (Debtors) Master,DATE_LAST_PAY,8,timestamp,N,Y,The date of the last amount received from the customer.
+ArMaster  -Financial- Customers (Debtors) Master,DAYS_120,12,numeric,N,Y,The total value of the amounts owing on the accounts that are 120 days or greater
+ArMaster  -Financial- Customers (Debtors) Master,DAYS_30,12,numeric,N,Y,The total value of the amounts owing on the account that are from the last month
+ArMaster  -Financial- Customers (Debtors) Master,DAYS_60,12,numeric,N,Y,The total value of the amounts owing on the account that are from 2 months ago
+ArMaster  -Financial- Customers (Debtors) Master,DAYS_90,12,numeric,N,Y,The total value of the amounts owing on the account that are from 3 mths or earlier
+ArMaster  -Financial- Customers (Debtors) Master,distribution_method,1,char,N,Y,"Customer's statement distribution method: Postage, Email or Fax"
+ArMaster  -Financial- Customers (Debtors) Master,LAST_AMOUNT_PAY,12,numeric,N,Y,The amount last remitted from the customer.
+ArMaster  -Financial- Customers (Debtors) Master,Last_Modified_Date,8,timestamp,N,Y,Records last modified date and time
+ArMaster  -Financial- Customers (Debtors) Master,LYTD_CREDITS,12,numeric,N,Y,"Denotes the total amount of credits, being either payments or returns, which have occurred against the account for the last financial year.."
+ArMaster  -Financial- Customers (Debtors) Master,LYTD_DEBITS,12,numeric,N,Y,"Denotes the total amount of sales, which have occurred against the customer's account for the last financial year"
+ArMaster  -Financial- Customers (Debtors) Master,ModifiedBy,20,char,N,Y,Customer Updated By User
+ArMaster  -Financial- Customers (Debtors) Master,Pay_Method,20,char,N,Y,"The default customer payment method. Account, Cash, check, Credit Card or Finance"
+ArMaster  -Financial- Customers (Debtors) Master,PRINT_DAYS,4,integer,N,Y,Select the frequency for statements to be sent (Monthly - 30 or Weekly - 7).
+ArMaster  -Financial- Customers (Debtors) Master,PRINT_STATEMENT,1,char,N,Y,Denotes whether or not to print a periodic statement for the customer (Y or N)
+ArMaster  -Financial- Customers (Debtors) Master,Rental_Credit_Limit,12,numeric,N,Y,Stores the Rental Credit Limit
+ArMaster  -Financial- Customers (Debtors) Master,Rental_Discount_Percentage,12,numeric,N,Y,Stores the Rental Discount Percentage to be applied to Rental Rates
+ArMaster  -Financial- Customers (Debtors) Master,STATEMENT_TYPE,1,char,N,Y,"Open Item accounts retain individual invoices and credit details until the full amount outstanding has been paid/allocated. Each outstanding amount will be listed on the statement. Balance Forward accounts, carry forward a single amount for the opening b"
+ArMaster  -Financial- Customers (Debtors) Master,user_field1,10,char,N,Y,Additional Information on customer can be added by the user (line 1)
+ArMaster  -Financial- Customers (Debtors) Master,user_field2,10,char,N,Y,Additional Information on customer can be added by the user (line 2)
+ArMaster  -Financial- Customers (Debtors) Master,user_field3,10,char,N,Y,Additional Information on customer can be added by the user (line 3)
+ArMaster  -Financial- Customers (Debtors) Master,YTD_CREDITS,12,numeric,N,Y,"Denotes the total amount of credits, being either payments or returns, which have occurred against the account from the beginning of the year until now."
+ArMaster  -Financial- Customers (Debtors) Master,YTD_DEBITS,12,numeric,N,Y,"Denotes the total amount of sales, which have occurred against the account from the beginning of the year until now."
+ArMaster  -Financial- Customers (Debtors) Master,user_field4,10,char,N,Y,Additional information on the Debtor that can be added by the user (line 4)
+ArMaster  -Financial- Customers (Debtors) Master,CreatedByApp,50,varchar,N,Y,Application that created the Contact

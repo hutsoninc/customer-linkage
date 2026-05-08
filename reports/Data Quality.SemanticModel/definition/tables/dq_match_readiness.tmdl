@@ -1,0 +1,216 @@
+table dq_match_readiness
+	lineageTag: 50af6123-b993-4c55-842b-065d7f92f187
+
+	column snapshot_date
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: dac01bb4-416f-4481-b090-17f3ab63a73f
+		summarizeBy: none
+		sourceColumn: snapshot_date
+
+		variation Variation
+			isDefault
+			relationship: 9adb4818-ff20-4d33-8afc-d6c9effbafa9
+			defaultHierarchy: LocalDateTable_74f0c0fb-7f44-4f88-b414-29e8ac10fd29.'Date Hierarchy'
+
+		annotation SummarizationSetBy = Automatic
+
+	column metric_category
+		dataType: string
+		lineageTag: 5f750438-9f5a-4d6a-8ccc-59a98c8d0c00
+		summarizeBy: none
+		sourceColumn: metric_category
+
+		annotation SummarizationSetBy = Automatic
+
+	column metric_name
+		dataType: string
+		lineageTag: 6e9bbd05-aefa-40a8-9946-1b7aae8ace3f
+		summarizeBy: none
+		sourceColumn: metric_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column contact_type
+		dataType: string
+		lineageTag: 02b0555a-b5b5-43c3-8fa9-731b44f3c757
+		summarizeBy: none
+		sourceColumn: contact_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column sales_decile
+		dataType: string
+		lineageTag: 4032b269-270f-4a89-89f7-bc8ed5118116
+		summarizeBy: none
+		sourceColumn: sales_decile
+
+		annotation SummarizationSetBy = Automatic
+
+	column staleness_bucket
+		dataType: string
+		lineageTag: 3a0d0691-8e5f-403b-a8f6-043d8455f513
+		summarizeBy: none
+		sourceColumn: staleness_bucket
+
+		annotation SummarizationSetBy = Automatic
+
+	column branch
+		dataType: string
+		lineageTag: b77b4b92-d350-47e3-a50c-13ca535ca51e
+		summarizeBy: none
+		sourceColumn: branch
+
+		annotation SummarizationSetBy = Automatic
+
+	column creation_cohort
+		dataType: string
+		lineageTag: 5a90845d-17b5-4b26-8297-78ee60e3c36a
+		summarizeBy: none
+		sourceColumn: creation_cohort
+
+		annotation SummarizationSetBy = Automatic
+
+	column numerator
+		dataType: int64
+		formatString: 0
+		lineageTag: 15f97d4d-aa99-44e9-b80c-654e14c3d80e
+		summarizeBy: sum
+		sourceColumn: numerator
+
+		annotation SummarizationSetBy = Automatic
+
+	column denominator
+		dataType: int64
+		formatString: 0
+		lineageTag: 4633b871-04ca-44c5-98b6-c2bf8152d3ee
+		summarizeBy: sum
+		sourceColumn: denominator
+
+		annotation SummarizationSetBy = Automatic
+
+	partition main = m
+		mode: import
+		source =
+				let
+				    Source = Sql.Database(
+				        "26uvtcjpbewezphfsvea336vji-pzx7gvzmumzubkrzfqlfxchiaa.datawarehouse.fabric.microsoft.com",
+				        "Bronze_Production_Lakehouse",
+				        [CreateNavigationProperties = false]
+				    ),
+				    Result = Value.NativeQuery(
+				        Source,
+				        "
+				WITH active_contacts AS (
+				    SELECT
+				        c.contact_code,
+				        c.Business_Individual,
+				        NULLIF(LTRIM(RTRIM(c.[name])),        '') AS first_name,
+				        NULLIF(LTRIM(RTRIM(c.surname)),       '') AS last_name,
+				        NULLIF(LTRIM(RTRIM(c.company_name)),  '') AS company_name,
+				        NULLIF(LTRIM(RTRIM(c.street)),        '') AS street,
+				        NULLIF(LTRIM(RTRIM(c.city)),          '') AS city,
+				        NULLIF(LTRIM(RTRIM(c.state)),         '') AS state,
+				        NULLIF(LTRIM(RTRIM(c.pcode)),         '') AS pcode,
+				        NULLIF(LTRIM(RTRIM(c.BusinessPhone)), '') AS biz_phone,
+				        NULLIF(LTRIM(RTRIM(c.PrivatePhone)),  '') AS priv_phone,
+				        NULLIF(LTRIM(RTRIM(c.MobilePhone)),   '') AS mob_phone,
+				        NULLIF(LTRIM(RTRIM(c.email_address)), '') AS email,
+				        CASE
+				            WHEN c.Creation_Date IS NULL              THEN 'Unknown'
+				            WHEN YEAR(c.Creation_Date) < 2015         THEN 'Pre-2015'
+				            WHEN YEAR(c.Creation_Date) < 2020         THEN '2015-2020'
+				            WHEN YEAR(c.Creation_Date) < 2025         THEN '2020-2025'
+				            ELSE                                           '2025+'
+				        END AS creation_cohort
+				    FROM [Bronze_Production_Lakehouse].[Equip].[contact] c
+				        LEFT JOIN [Bronze_Production_Lakehouse].[Equip].[WKMECHFL] wk
+				            ON wk.[Code] = c.contact_code
+				        LEFT JOIN [Bronze_Production_Lakehouse].[Equip].[VhSalman] vs
+				            ON vs.[CODE] = c.contact_code
+				    WHERE ISNULL(c.Inactive_Indicator, 'A') <> 'I'
+				      AND wk.[Code] IS NULL
+				      AND vs.[CODE] IS NULL
+				),
+				unlinked_contacts AS (
+				    SELECT ac.*
+				    FROM active_contacts ac
+				        LEFT JOIN [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref] xr
+				            ON UPPER(xr.cross_ref_number) = UPPER(ac.contact_code)
+				           AND xr.entity_id <> 999999998
+				    WHERE xr.cross_ref_number IS NULL
+				),
+				tiered AS (
+				    SELECT
+				        contact_code,
+				        Business_Individual,
+				        creation_cohort,
+				        CASE
+				            WHEN Business_Individual IN ('I', 'C')
+				                 AND first_name IS NOT NULL
+				                 AND last_name  IS NOT NULL  THEN 1
+				            WHEN Business_Individual = 'B'
+				                 AND company_name IS NOT NULL THEN 1
+				            ELSE 0
+				        END AS has_name,
+				        CASE
+				            WHEN street IS NOT NULL AND city IS NOT NULL AND state IS NOT NULL THEN 1
+				            WHEN street IS NOT NULL AND pcode IS NOT NULL                       THEN 1
+				            ELSE 0
+				        END AS has_full_address,
+				        CASE
+				            WHEN street IS NOT NULL OR city  IS NOT NULL
+				              OR state  IS NOT NULL OR pcode IS NOT NULL THEN 1
+				            ELSE 0
+				        END AS has_partial_address,
+				        CASE
+				            WHEN biz_phone IS NOT NULL OR priv_phone IS NOT NULL
+				              OR mob_phone  IS NOT NULL OR email      IS NOT NULL THEN 1
+				            ELSE 0
+				        END AS has_contact_info
+				    FROM unlinked_contacts
+				),
+				tiered_with_label AS (
+				    SELECT
+				        contact_code,
+				        Business_Individual,
+				        creation_cohort,
+				        CASE
+				            WHEN has_name = 0                                                       THEN 4
+				            WHEN has_name = 1 AND has_full_address    = 1                           THEN 1
+				            WHEN has_name = 1 AND (has_partial_address = 1 OR has_contact_info = 1) THEN 2
+				            ELSE                                                                         3
+				        END AS tier
+				    FROM tiered
+				)
+				SELECT
+				    CAST(GETDATE() AS date)  AS snapshot_date,
+				    'match_readiness'        AS metric_category,
+				    CASE tier
+				        WHEN 1 THEN 'tier_1_strong'
+				        WHEN 2 THEN 'tier_2_partial'
+				        WHEN 3 THEN 'tier_3_name_only'
+				        WHEN 4 THEN 'tier_4_no_name'
+				    END                      AS metric_name,
+				    Business_Individual      AS contact_type,
+				    'ALL'                    AS sales_decile,
+				    'ALL'                    AS staleness_bucket,
+				    'ALL'                    AS branch,
+				    creation_cohort,
+				    COUNT(*)                 AS numerator,
+				    SUM(COUNT(*)) OVER (
+				        PARTITION BY Business_Individual, creation_cohort
+				    )                        AS denominator
+				FROM tiered_with_label
+				GROUP BY tier, Business_Individual, creation_cohort
+				",
+				        null,
+				        [EnableFolding = false]
+				    )
+				in
+				    Result
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

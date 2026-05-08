@@ -1,0 +1,29 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_ProTooling = ["DevMode"]
+
+annotation PBI_QueryOrder = ["dq_completeness","dq_linkage","dq_field_quality","dq_staleness","dq_match_readiness","dq_parity"]
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+ref table dq_completeness
+ref table dq_linkage
+ref table dq_field_quality
+ref table dq_staleness
+ref table dq_match_readiness
+ref table dq_parity
+ref table data_quality_snapshot
+ref table DateTableTemplate_884f55c6-dee1-4d6d-8fb8-5f89352b18cf
+ref table LocalDateTable_1887c173-2178-4b86-9599-6a3d99e5512e
+ref table LocalDateTable_d74030c3-2e3a-434d-b21f-8f43a7c03a55
+ref table LocalDateTable_82289381-218a-452d-9e3e-7db41e738623
+ref table LocalDateTable_74f0c0fb-7f44-4f88-b414-29e8ac10fd29
+ref table LocalDateTable_0b2d0164-b24c-4040-a4c4-0c1fd1805d7d
+ref table LocalDateTable_b537b5c9-653b-4bd7-bae4-0861c7c3e571
+

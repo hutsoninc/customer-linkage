@@ -1,0 +1,83 @@
+table data_quality_snapshot
+	lineageTag: 264086df-7903-42d1-be62-6ceff215e1f5
+
+	measure 'Issue Rate %' = DIVIDE(SUM(data_quality_snapshot[numerator]), SUM(data_quality_snapshot[denominator]))
+		formatString: 0.0%
+		lineageTag: 2b0cdee1-5b52-461e-bba8-ddc4bca28aed
+
+	measure 'Issue Count' = SUM(data_quality_snapshot[numerator])
+		formatString: #,##0
+		lineageTag: d4251b38-8fd9-46fa-8b27-4cdf2d4eb02b
+
+	measure 'Record Count' = SUM(data_quality_snapshot[denominator])
+		formatString: #,##0
+		lineageTag: 47fa31e2-82f3-4210-a145-f32014cfa7a9
+
+	measure '% Linked' = DIVIDE(CALCULATE(SUM(data_quality_snapshot[numerator]), data_quality_snapshot[metric_name]="linked_count"), CALCULATE(SUM(data_quality_snapshot[denominator]), data_quality_snapshot[metric_name]="linked_count"))
+		formatString: 0.0%
+		lineageTag: 1cb204fe-afc4-45c9-96af-57c8efe83a46
+
+	measure 'Staleness 5yr+ Count' = CALCULATE(SUM(data_quality_snapshot[numerator]), data_quality_snapshot[metric_name]="5+yr")
+		formatString: #,##0
+		lineageTag: 43436fc9-9998-4dfb-858f-7efb98596625
+
+	measure 'Match Ready %' = DIVIDE(CALCULATE(SUM(data_quality_snapshot[numerator]), data_quality_snapshot[metric_name]="tier_1_strong") + CALCULATE(SUM(data_quality_snapshot[numerator]), data_quality_snapshot[metric_name]="tier_2_partial"), CALCULATE(SUM(data_quality_snapshot[denominator]), data_quality_snapshot[metric_name]="tier_1_strong"))
+		formatString: 0.0%
+		lineageTag: eda50d6d-da9b-4ede-8ea1-3873d449c473
+
+	column snapshot_date
+		lineageTag: e1d8045b-325f-4c33-b072-15058da96523
+		isNameInferred
+		sourceColumn: dq_completeness[snapshot_date]
+
+	column metric_category
+		lineageTag: ee3bd67a-64c6-4084-b13a-90a8dc1061b3
+		isNameInferred
+		sourceColumn: dq_completeness[metric_category]
+
+	column metric_name
+		lineageTag: f8c24644-f0d8-40e9-9575-975a6a2a30a9
+		isNameInferred
+		sourceColumn: dq_completeness[metric_name]
+
+	column contact_type
+		lineageTag: e2f62222-e193-483c-b54c-788179cde67e
+		isNameInferred
+		sourceColumn: dq_completeness[contact_type]
+
+	column sales_decile
+		lineageTag: bf57f432-a5d3-4d58-a38f-ef4cd2c40ade
+		isNameInferred
+		sourceColumn: dq_completeness[sales_decile]
+
+	column staleness_bucket
+		lineageTag: 3cb863fd-169d-426c-866d-a552bc473056
+		isNameInferred
+		sourceColumn: dq_completeness[staleness_bucket]
+
+	column branch
+		lineageTag: e0a91c2f-0eca-40d8-96bc-e329e76f8c43
+		isNameInferred
+		sourceColumn: dq_completeness[branch]
+
+	column creation_cohort
+		lineageTag: d40588c9-ee1a-481f-a7fb-baef70416660
+		isNameInferred
+		sourceColumn: dq_completeness[creation_cohort]
+
+	column numerator
+		formatString: #,0
+		lineageTag: 53122f64-be20-4cf0-9b64-5a494f153b18
+		isNameInferred
+		sourceColumn: dq_completeness[numerator]
+
+	column denominator
+		formatString: #,0
+		lineageTag: b6ae9a42-ff89-439b-8e3f-dc02b9c0523c
+		isNameInferred
+		sourceColumn: dq_completeness[denominator]
+
+	partition data_quality_snapshot = calculated
+		mode: import
+		source = UNION(dq_completeness, dq_linkage, dq_field_quality, dq_staleness, dq_match_readiness, dq_parity)
+

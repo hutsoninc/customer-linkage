@@ -49,15 +49,26 @@ Every metric is pre-aggregated across all dimension combinations at snapshot tim
 Defined in full in Section 5. Used as both a standalone metric and a cross-dimension for the staleness × decile matrix.
 
 #### Branch
-- Branch ID from the territory field on `Equip.contact` (field name TBD — see Open Questions)
-- A branch dimension table will be brought into the data model to carry attributes like active/closed status and location name — branch ID is stored in the snapshot table and joined to the dim in Power BI
+- Branch code from `TERRITORY` (char 3) on `Equip.ArMaster_Customer` — confirmed field name, Fabric-verified 2026-05-08
+- Join path: `Equip.contact` → `Equip.ArMaster_Customer` ON `contact_code` (LEFT JOIN already in the snapshot CTE for `acc_no`)
+- Contacts with no `ArMaster_Customer` record or no `TERRITORY` value → NULL branch → labeled `'Unassigned'` in Power BI
+- A branch dimension table will be brought into the Power BI data model to carry attributes like active/closed status and location name — `TERRITORY` code is stored in the snapshot table and joined to the dim in Power BI
 - 28 active locations + some closed from acquisitions — primarily useful for spotting acquisition data quality patterns; closed/active classification comes from the dim table, not the snapshot
 
 #### Creation Cohort
-- Binned from `Equip.contact.Creation_Date`: `Pre-2015`, `2015–2020`, `2020–2025`, `2025+`
-- `2025+` isolates the most recent records to see current data entry quality independently
-- `2020–2025` is expected to be skewed by acquisitions loaded in 2021 and 2022 — worth filtering by branch to separate acquisition records from organic growth in that window
-- Distinguishes legacy data quality debt from ongoing data entry problems: if Pre-2015 records dominate the flags it's historical debt; if 2020–2025 or 2025+ are equally bad it's a process problem
+- Binned from `Equip.contact.Creation_Date` into four exclusive buckets:
+
+| Bucket | Years covered | SQL condition |
+|---|---|---|
+| `Pre-2015` | 2015 and earlier | `YEAR(Creation_Date) < 2016` |
+| `2016-2020` | 2016 through 2020 | `YEAR(Creation_Date) BETWEEN 2016 AND 2020` |
+| `2021-2025` | 2021 through 2025 | `YEAR(Creation_Date) BETWEEN 2021 AND 2025` |
+| `2026+` | 2026 onward | `YEAR(Creation_Date) >= 2026` |
+| `Unknown` | NULL Creation_Date | `Creation_Date IS NULL` |
+
+- `2026+` isolates the most recent records to see current data entry quality independently
+- `2021-2025` is expected to be skewed by acquisitions loaded in 2021 and 2022 — worth filtering by branch to separate acquisition records from organic growth in that window
+- Distinguishes legacy data quality debt from ongoing data entry problems: if `Pre-2015` records dominate the flags it's historical debt; if `2021-2025` or `2026+` are equally bad it's a process problem
 
 ### Power BI
 - **Current state:** filter snapshot table to `MAX(snapshot_date)`
@@ -368,11 +379,11 @@ All pages support slicing by contact type (B/I/C), branch, sales decile, stalene
 - [ ] **Staleness dataset join** — what is the exact table/view name and key column for the EQUIP Accounts dataset with last transaction date? Confirm the join key matches `ArMaster.ACC_NO`.
 - [ ] **Suffix valid value list** — run `SELECT DISTINCT Suffix, COUNT(*) FROM Equip.contact WHERE Suffix IS NOT NULL GROUP BY Suffix ORDER BY COUNT(*) DESC` to surface the actual values in use before defining the valid list.
 - [ ] **Prefix valid value list** — query Type Code Maintenance `TI` codes to get the authoritative prefix list. Confirm the values match what's actually stored in `title`.
+- [ ] **Registry distinct values for prefix and suffix** — identify the column names in `DDP.customer_profile` for title/prefix and suffix (likely `title_cd`/`name_suffix_txt` or similar — confirm via schema query). Run `SELECT DISTINCT <col>, COUNT(*) ... GROUP BY <col> ORDER BY COUNT(*) DESC` for each. Cross-reference against the EQUIP distinct-value results to surface any values present in Registry but missing from the EQUIP valid list, and vice versa.
 - [ ] **Match readiness tier calibration** — after first Phase 3 upload batch, pull tight match rate by tier to validate thresholds. Adjust tier definitions if empirical results differ from expectations.
 - [ ] **Overall quality score weights** — defer weight decisions until baseline counts are known. Revisit after Phase 3 to validate against match outcomes.
 - [ ] **Sales decile — revenue field** — confirm the exact field name and table for 5-year revenue in the Accounts dataset. Clarify whether it's a running total or needs to be aggregated from transaction rows. Confirm the join key to `ArMaster.ACC_NO`.
-- [ ] **Branch field name** — confirm the exact column name for the territory/branch field on `Equip.contact`. Confirm it carries a branch ID that joins to the branch dimension table.
-- [ ] **Branch dimension table** — identify the table to bring in as a dim (location name, active/closed status, acquisition flag). Confirm it's available in Fabric or needs to be loaded.
+- [ ] **Branch dimension table** — identify the Fabric table carrying branch name, active/closed status, and acquisition flag. `TERRITORY` (3-char code) on `Equip.ArMaster_Customer` is the confirmed join key. Dim table join stays in Power BI, not in the snapshot query.
 
 ---
 

@@ -6,14 +6,14 @@ Formal linkage between EQUIP (dealer DBS) contacts and John Deere's Customer Reg
 
 | File | Purpose |
 |---|---|
-| `docs/project-plan.md` | Phase order of operations, open questions |
-| `docs/linkage-progress.md` | Batch log — update after every accepted upload |
-| `docs/research-findings.md` | All query blocks, results, findings |
-| `docs/query-conventions.md` | Full SQL patterns with examples (UPPER join, country, employee exclusion, B/I/C logic) |
 | `docs/data-model.md` | ERD, table relationships, field semantics |
-| `docs/dataset-equip-contact.md` | Equip.contact column reference + upload template mapping |
-| `docs/source-materials-summary.md` | Consolidated Deere reference documents |
 | `docs/data-quality-plan.md` | Data quality reporting plan — metrics, snapshot architecture, Power BI structure, open questions |
+| `docs/dataset-equip-contact.md` | Equip.contact column reference + upload template mapping |
+| `docs/linkage-progress.md` | Batch log — update after every accepted upload |
+| `docs/project-plan.md` | Phase order of operations, open questions |
+| `docs/query-conventions.md` | Full SQL patterns with examples (UPPER join, country, employee exclusion, B/I/C logic) |
+| `docs/research-findings.md` | All query blocks, results, findings |
+| `docs/source-materials-summary.md` | Consolidated Deere reference documents |
 
 ## Directory Structure
 
@@ -21,6 +21,14 @@ Formal linkage between EQUIP (dealer DBS) contacts and John Deere's Customer Reg
 queries/
   research/        block-1a through block-6i (exploratory)
   phase-1/         production queries (block-5e, block-7a/b/c/d)
+  data-quality/    data quality snapshots (run on demand or scheduled)
+    dq-completeness.sql          field fill rates across all contacts
+    dq-field-quality.sql         free-text field anomalies (length, case, garbage)
+    dq-field-quality-coded-fields.sql  coded field validity (state, country, B/I/C, etc.)
+    dq-linkage-quality.sql       linkage health — mismatches, sentinels, stale CKC IDs
+    dq-match-readiness.sql       unlinked contacts scored for match readiness
+    dq-registry-parity.sql       EQUIP vs Registry divergence (linked contacts only)
+    dq-staleness.sql             contacts with stale or missing last-activity dates
   tracking.sql     linkage progress query — run after each batch
 results/           CSV query results (gitignored, regenerable)
 uploads/           import files for Customer Linkage Tool
@@ -61,12 +69,13 @@ Full patterns with examples in `docs/query-conventions.md`. Summary:
 | Table | System | Key Columns |
 |---|---|---|
 | `Equip.contact` | EQUIP | `contact_code` PK, `Business_Individual` B/I/C, `Ckc_Id`, `Cmp_Ckc_Id` |
-| `Equip.ArMaster` | EQUIP | `ACC_NO` PK, `contact_code` FK — 1:1 with contact |
+| `Equip.ArMaster` | EQUIP | `ACC_NO` PK (= Salesforce `Anvil__AccountNumber__c`), `contact_code` FK (nullable) — financial master: balances, credit, aging |
+| `Equip.ArMaster_Customer` | EQUIP | `contact_code` FK NOT NULL, `BILL_TO_ACC` → ArMaster.ACC_NO, `Customer_No` alt ref, `TERRITORY` branch — 1:1 with contact |
 | `Equip.WKMECHFL` | EQUIP | `Code` = contact_code (technicians) — exclude from uploads |
 | `Equip.VhSalman` | EQUIP | `CODE` = contact_code (salespersons) — exclude from uploads |
 | `DDP.customer_cross_ref` | Registry | `cross_ref_number` (ALL CAPS = contact_code), `entity_id`, `contact_id`, `cross_ref_created_ts` |
 | `DDP.customer_profile` | Registry | `entity_id`, `contact_id`, `out_of_busn_ind`, `descd_ind` |
-| `Salesforce.Account` | Salesforce | `Anvil__AccountNumber__c` (= ACC_NO), `Anvil__CustomerCompEntityID__c`, `H_Equip_contact_Ckc_Id__c` |
+| `Salesforce.Account` | Salesforce | `Anvil__AccountNumber__c` (= ArMaster.ACC_NO), `Anvil__CustomerCompEntityID__c`, `H_Equip_contact_Ckc_Id__c` |
 
 **Ckc_Id semantics:** B/I → own Entity ID. C → parent Business Entity ID; `Cmp_Ckc_Id` = own Contact ID.  
 **SF precedence:** `H_Equip_contact_Ckc_Id__c` (EQUIP formal) overwrites `Anvil__CustomerCompEntityID__c` (quote workflow).
@@ -76,3 +85,31 @@ Full patterns with examples in `docs/query-conventions.md`. Summary:
 - **Baseline:** 58,336 linkages as of 2026-04-29
 - Run `queries/tracking.sql` after each batch; log results in `docs/linkage-progress.md`
 - ~40–100 background linkages/day from normal EQUIP workflow — not project-attributed
+
+<!-- pbi-cli:start -->
+# Power BI CLI (pbi-cli)
+
+When working with Power BI, DAX, semantic models, or data modeling,
+invoke the relevant pbi-cli skill before responding:
+
+**Semantic Model (requires `pbi connect`):**
+- **power-bi-dax** -- DAX queries, measures, calculations
+- **power-bi-modeling** -- tables, columns, measures, relationships
+- **power-bi-deployment** -- TMDL export/import, transactions, diff
+- **power-bi-docs** -- model documentation, data dictionary
+- **power-bi-partitions** -- partitions, M expressions, data sources
+- **power-bi-security** -- RLS roles, perspectives, access control
+- **power-bi-diagnostics** -- troubleshooting, tracing, setup
+
+**Report Layer (no connection needed):**
+- **power-bi-report** -- scaffold, validate, preview PBIR reports
+- **power-bi-visuals** -- add, bind, update, bulk-manage visuals
+- **power-bi-pages** -- pages, bookmarks, visibility, drillthrough
+- **power-bi-themes** -- themes, conditional formatting, styling
+- **power-bi-filters** -- page and visual filters (TopN, date, categorical)
+- **power-bi-custom-visuals** -- vibe-code .pbiviz custom visuals 
+(TS scaffold, tsc loop, package, import)
+
+Critical: Multi-line DAX (VAR/RETURN) cannot be passed via `-e`.
+Use `--file` or stdin piping instead. See power-bi-dax skill.
+<!-- pbi-cli:end -->

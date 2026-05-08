@@ -1,0 +1,240 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.8.0/schema.json",
+  "name": "306f51837a903ed9edc9",
+  "position": {
+    "x": 128,
+    "y": 16,
+    "z": 0,
+    "height": 608,
+    "width": 576,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "pivotTable",
+    "query": {
+      "queryState": {
+        "Columns": {
+          "projections": []
+        },
+        "Rows": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "metric_category"
+                }
+              },
+              "queryRef": "data_quality_snapshot.metric_category",
+              "nativeQueryRef": "metric_category",
+              "active": true
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "metric_name"
+                }
+              },
+              "queryRef": "data_quality_snapshot.metric_name",
+              "nativeQueryRef": "metric_name",
+              "active": true
+            }
+          ]
+        },
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "data_quality_snapshot"
+                        }
+                      },
+                      "Property": "numerator"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(data_quality_snapshot.numerator)",
+              "nativeQueryRef": "Numerator",
+              "displayName": "Numerator"
+            },
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "data_quality_snapshot"
+                        }
+                      },
+                      "Property": "denominator"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(data_quality_snapshot.denominator)",
+              "nativeQueryRef": "Denominator",
+              "displayName": "Denominator"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "data_quality_snapshot"
+                    }
+                  },
+                  "Property": "Issue Rate %"
+                }
+              },
+              "queryRef": "data_quality_snapshot.Issue Rate %",
+              "nativeQueryRef": "Issue Rate %"
+            }
+          ]
+        }
+      }
+    },
+    "expansionStates": [
+      {
+        "roles": [
+          "Rows"
+        ],
+        "levels": [
+          {
+            "queryRefs": [
+              "data_quality_snapshot.metric_category"
+            ],
+            "isPinned": true
+          },
+          {
+            "queryRefs": [
+              "data_quality_snapshot.metric_name"
+            ],
+            "isCollapsed": true,
+            "isPinned": true
+          }
+        ],
+        "root": {}
+      }
+    ],
+    "objects": {
+      "columnWidth": [
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "280D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "data_quality_snapshot.metric_category"
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "4dc1bb06a4e1d1d3d002",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "data_quality_snapshot"
+              }
+            },
+            "Property": "metric_category"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "a2719a08b1a5428c9ec3",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "data_quality_snapshot"
+              }
+            },
+            "Property": "metric_name"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "27e5540470c5c36198a5",
+        "field": {
+          "Aggregation": {
+            "Expression": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "data_quality_snapshot"
+                  }
+                },
+                "Property": "numerator"
+              }
+            },
+            "Function": 0
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "5eac0b2a4b98947bcb5a",
+        "field": {
+          "Aggregation": {
+            "Expression": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "data_quality_snapshot"
+                  }
+                },
+                "Property": "denominator"
+              }
+            },
+            "Function": 0
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "6c69a59721c929070314",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "data_quality_snapshot"
+              }
+            },
+            "Property": "Issue Rate %"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}
