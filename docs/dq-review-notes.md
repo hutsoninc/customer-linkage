@@ -15,7 +15,7 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 | `[!]` | `linked_count` — % linked by type (B/I/C) | Informational only — not an issue metric; including it in issue rate numerator muddies the calculation. Denominator is higher than completeness metrics — ~2 extra contacts unaccounted for | Investigate why `contact_linkage` denominator exceeds `contact_enriched` count; likely a fan-out from the LEFT JOIN to `customer_cross_ref` producing duplicate rows for contacts with multiple cross-ref entries |
 | `[!]` | `unlinked_count` — unlinked by type | Values look correct relative to linked count; this one IS an issue metric. Shares the same inflated denominator issue. | Same investigation as `linked_count` |
 | `[x]` | `ckc_id_no_cross_ref` — has Ckc_Id but no cross_ref | Looks correct | |
-| `[!]` | `type_mismatch_linkage` — C at entity level / B·I at contact level | 90% issue rate — suspiciously high | Review logic: check whether `contact_id = 0` / `<> 0` conditions are correct, and whether NULLs need to be handled |
+| `[x]` | `type_mismatch_linkage` — C at entity level / B·I at contact level | Logic was inverted — was flagging correct linkages as mismatches. Corrected: C with `contact_id = 0 / NULL` is now a mismatch; B/I with `contact_id != 0` is now a mismatch. Awaiting re-run to verify actual rate. | See Action Item #14 — verify denominator consistency across linkage metrics |
 | `[ ]` | `duplicate_entity_id` — entity IDs with 2+ linked contacts | | |
 | `[!]` | `orphan_cross_ref` — cross_ref entries with no active EQUIP contact | Count inflated — query is not filtering to Hutson linkages only | Add `cross_ref_description = 'HUTSON INC Dealer XREF'` filter to both the numerator and denominator; exclude EDA and other cross-ref types |
 
@@ -29,27 +29,27 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 
 | Status | Field | Finding | Follow-up |
 |---|---|---|---|
-| `[!]` | `company_name` (B) | Missing from report — rolling into blank metric bucket | Fix NULL concatenation bug in Section 2 (`CONCAT()` instead of `+`) |
+| `[!]` | `company_name` (B) | Denominator only 144 — B-only scope is too narrow; C contacts (business contacts linked to a company entity) also carry company names and should be included in the comparison | See Action Item #8 — evaluate expanding business field parity to include C contacts |
 | `[!]` | `first_name` (I, C) | Missing from report — rolling into blank metric bucket | Same fix |
 | `[!]` | `last_name` (I, C) | Missing from report — rolling into blank metric bucket | Same fix |
 | `[!]` | `email` | Missing from report — rolling into blank metric bucket | Same fix |
-| `[!]` | `business_phone` | Missing from report — rolling into blank metric bucket | Same fix |
+| `[!]` | `business_phone` | `equip_only` outcome at ~93% — very high; parity logic needs re-examination | See Action Item #13 — verify phone concatenation format matches EQUIP storage |
 | `[!]` | `private_phone` | Missing from report — rolling into blank metric bucket | Same fix |
 | `[!]` | `mobile_phone` | Missing from report — rolling into blank metric bucket | Same fix |
 | `[!]` | `street` | Missing from report — rolling into blank metric bucket | Same fix |
 | `[!]` | `city` | Missing from report — rolling into blank metric bucket | Same fix |
 | `[!]` | `state` | Missing from report — rolling into blank metric bucket | Same fix |
-| `[!]` | `zip` | Missing from report — rolling into blank metric bucket | Same fix |
+| `[!]` | `zip` | High mismatch rate — likely inflated by Registry storing ZIP+4 (e.g., `42101-1234`) vs. EQUIP 5-digit only | See Action Items #11 and #12 — truncate comparison to 5 digits and update `zip_not_5digits` to accept ZIP+4 |
 | `[!]` | `country` | Missing from report — rolling into blank metric bucket | Same fix |
 
 ### Priority parity metrics
 
 | Status | Metric | Finding | Follow-up |
 |---|---|---|---|
-| `[!]` | `phys_addr_certified_mismatch` — Registry USPS-certified, EQUIP differs | Missing from report parity group entirely | Confirm the metric is present in the snapshot table; if so, check whether it's being filtered out in Power BI or if the query is producing no rows (possible if no linked contacts have `phys_postal_certified = 'Y'`) |
-| `[!]` | `address_confirmed_undeliverable` — Registry flagged undeliverable | Unclear what numerator and denominator represent | Definition will likely clarify; revisit after metric dim table with definitions is added to report |
+| `[!]` | `phys_addr_certified_mismatch` — Registry USPS-certified, EQUIP differs | ~100% issue rate — exact-string equality between EQUIP and USPS-certified Registry address will almost never match without copying Registry data into EQUIP | See Action Item #10 — evaluate dropping this metric entirely |
+| `[!]` | `address_confirmed_undeliverable` — Registry flagged undeliverable | 39 / 13,015 — denominator unexpectedly low (~13K vs ~58K linked contacts) | See Action Item #16 — investigate whether the denominator is unintentionally scoped to contacts with a non-null physical address or some other sub-population |
 | `[!]` | `registry_oob_equip_active` — Registry OOB, EQUIP still active (B) | ~110 numerator — unclear what population this represents | Confirm numerator = B contacts where Registry `out_of_busn_ind = 'Y'` AND EQUIP active, and denominator = all linked B contacts |
-| `[!]` | `registry_deceased_equip_active` — Registry deceased, EQUIP still active (I, C) | 409 / 28,000 — may have numerator and denominator swapped | Confirm numerator = I/C contacts where Registry `descd_ind = 'Y'` AND EQUIP active, denominator = all linked I/C contacts; verify the rate direction is correct |
+| `[!]` | `registry_deceased_equip_active` — Registry deceased, EQUIP still active (I, C) | 410 / 28,849 — verify denominator is linked I/C contacts only, not all Registry deceased or all inactive contacts | See Action Item #15 — confirm denominator scope |
 | `[!]` | `equip_inactive_reason_mismatch` — inactive reason conflicts with Registry flag | 11 / 34 — unclear what these two populations are | Confirm numerator = inactive EQUIP contacts where `Inactive_Reason` conflicts with Registry flag, denominator = all linked inactive contacts; verify `Inactive_Reason` field name is correct in the query |
 
 **Notes:** Blank/unknown metric name appearing in Power BI under parity — 645K numerator / 1.8M denominator. None of the field-level parity metrics (company_name, first_name, email, phone, address, etc.) are visible in the report — strongly suggests all of them are rolling into this blank bucket. Root cause is almost certainly the `field_name + '_' + parity_result` concatenation in Section 2 producing NULL when either side is NULL (T-SQL string + NULL = NULL). Fix: wrap both sides with `ISNULL(..., '')` or use `CONCAT()` instead of `+`. The 645K / 1.8M volume is consistent with 12 fields × 5 parity outcomes × all linked contacts.
@@ -84,7 +84,7 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 
 | Status | Metric | Finding | Follow-up |
 |---|---|---|---|
-| `[ ]` | `placeholder_name` | | |
+| `[!]` | `placeholder_name` | Valid list is too narrow — only covers literal "FIRSTNAME", "FIRST NAME", "FNAME", etc. | See Action Item #19 — add NONE, UNKNOWN, N/A, NA, NOT APPLICABLE to the pattern list |
 | `[ ]` | `name_all_same_char` | | |
 | `[ ]` | `name_numeric_only` | | |
 | `[ ]` | `status_text_in_name` | | |
@@ -189,13 +189,25 @@ Consolidated list of follow-up tasks surfaced during review. Add rows as you go.
 
 | # | Category | Action | Priority | Status |
 |---|---|---|---|---|
-| 1 | Report | Build a metric dimension table in Power BI using the labels and definitions in the Metric Dimension Reference section below — gives every metric a clean display name and tooltip/description in the report | Medium | `[ ]` |
-| 3 | Match Readiness / Staleness | Mixed denominators across tiers and staleness buckets — all buckets within a category should share the same base so they sum to 100%. Likely the same root cause: window function partition in the snapshot query, or Power BI double-counting pre-aggregated denominators when rolling up across dimension slices. Investigate both sections together. | Medium | `[ ]` |
+| 1 | Report | Build a metric dimension table in Power BI using the labels and definitions in the Metric Dimension Reference section below — gives every metric a clean display name and tooltip/description in the report | Medium | `[x]` |
+| 3 | Match Readiness / Staleness | Mixed denominators across tiers and staleness buckets — all buckets within a category should share the same base so they sum to 100%. Likely the same root cause: window function partition in the snapshot query, or Power BI double-counting pre-aggregated denominators when rolling up across dimension slices. Investigate both sections together. | Medium | `[x]` |
 | 7 | Data Model | Build a per-contact issue mapping table (`dq_contact_issues`) that is created/overwritten with each snapshot run. Schema: `snapshot_date`, `metric_name`, `contact_code`. One row per contact per active issue. Joinable to `Equip.contact` on `contact_code` to get full account details. Enables filtering by issue in Power BI to see exactly which contacts are affected — the aggregated snapshot table only stores counts; this provides the drill-through detail layer. | High | `[ ]` |
 | 6 | Report / Linkage Snapshot | Add total active contact count as a headline metric in the DQ report. Consider consolidating the existing linkage snapshot report into this one. Before doing so, correct the linkage snapshot: (1) switch from EQUIP `Ckc_Id`-based linked count to `customer_cross_ref`-based count to match the DQ snapshot approach, and (2) confirm the snapshot is counting contacts, not accounts — Deere tracks linkage at the contact level | High | `[ ]` |
 | 5 | All Categories | Do a code review pass on every metric's query logic in `dq-snapshot.sql` — report values may look plausible but the underlying SQL conditions should be verified individually (correct field, correct scope, correct null handling, correct denominator population) | Low | `[ ]` |
-| 4 | Staleness | Verify `Never Transacted` is scoped to contacts with an ArMaster record only — the `last_tx` LEFT JOIN returns NULL for both no-account contacts and contacts with an account but no transactions; confirm the bucket assignment logic separates these two cases correctly | Medium | `[ ]` |
-| 2 | Metric Dim | Add an `is_issue` flag to the metric dimension table to distinguish true issue metrics (numerator = problem count, drives issue rate) from informational metrics (e.g., `linked_count` — not a problem, but muddies a global issue rate if included). Power BI issue rate measure should filter to `is_issue = true` before dividing numerator by denominator. | Medium | `[ ]` |
+| 4 | Staleness | Verify `Never Transacted` is scoped to contacts with an ArMaster record only — the `last_tx` LEFT JOIN returns NULL for both no-account contacts and contacts with an account but no transactions; confirm the bucket assignment logic separates these two cases correctly | Medium | `[x]` |
+| 2 | Metric Dim | Add an `is_issue` flag to the metric dimension table to distinguish true issue metrics (numerator = problem count, drives issue rate) from informational metrics (e.g., `linked_count` — not a problem, but muddies a global issue rate if included). Power BI issue rate measure should filter to `is_issue = true` before dividing numerator by denominator. | Medium | `[x]` |
+| 9 | Registry Parity | Verify outcome totals equal denominator for every parity field. For each field and dimension slice, the sum of all five outcomes (match + mismatch + equip_only + registry_only + both_null) should equal the denominator. Query the snapshot table grouping by `metric_name` prefix and dim columns, sum numerators across all five outcome suffixes, and confirm the total matches the stored denominator. Flag any field where they diverge — indicates a contact is being double-counted or dropped. Apply the same total-must-equal-denominator check to other metric categories as well. | Medium | `[x]` |
+| 8 | Registry Parity | Expand business field parity scope to include C contact types. `company_name` currently filters to `Business_Individual = 'B'` only — denominator was only 144, suggesting most business contacts (C type) are excluded. C contacts are linked to a business entity and also carry company names. Evaluate whether `company_name` and other fields shared by businesses and their contacts (`street`, `city`, `state`, `zip`, `country`) should include `Business_Individual IN ('B', 'C')` in their scope filter. | Medium | `[ ]` |
+| 10 | Registry Parity | Evaluate dropping `phys_addr_certified_mismatch` — near-100% issue rate. Exact-string equality between EQUIP and a USPS-certified Registry address will almost never match without copying Registry data directly into EQUIP. Low actionability as a mismatch metric. Consider replacing with an informational flag ("has USPS-certified Registry address") rather than a parity check. | Low | `[ ]` |
+| 11 | Registry Parity | Fix `zip_*` parity comparison to compare only the first 5 digits — Registry stores ZIP+4 (e.g., `42101-1234`) while EQUIP typically stores 5-digit zip only. Exact equality artificially inflates the mismatch rate. Change the parity logic to compare `LEFT(pcode, 5)` vs `LEFT(reg_pcode, 5)` (T-SQL) or `SUBSTRING(pcode, 1, 5)` (PySpark). | Medium | `[ ]` |
+| 12 | Field Quality | Update `zip_not_5digits` metric to accept 5-digit OR 9-digit (ZIP+4) as valid — currently flags all ZIP+4 values as invalid. A 9-digit zip matching `NNNNN-NNNN` or `NNNNNNNNN` is a valid format and should not be counted as an issue. Related to Action Item #11. | Low | `[ ]` |
+| 13 | Registry Parity | Re-examine `business_phone` parity — `equip_only` outcome at ~93% is very high. Verify the concatenation logic that combines Registry `work_area_cd` + `work_phone_num` produces the same format as EQUIP's `BusinessPhone` (10-digit, no separators). Possible issues: area code stored with separators, leading zeros dropped, or Registry returning empty string vs NULL for one component. | Medium | `[ ]` |
+| 14 | Linkage Quality | Investigate varying denominators across linkage metrics — `type_mismatch_linkage`, `duplicate_entity_id`, `orphan_cross_ref`, and `ckc_id_no_cross_ref` show denominators ranging from 58,778 to 58,831. Each metric likely uses a slightly different base population (e.g., all active contacts vs. linked-only vs. cross_ref entries). Document the intended denominator for each and confirm queries are using the correct scope. | Medium | `[ ]` |
+| 15 | Registry Parity | Verify denominator for `registry_deceased_equip_active` — observed 410 / 28,849. Confirm denominator is all linked active I/C contacts, not all Registry-marked-deceased contacts regardless of linkage or all inactive contacts. If the 28,849 figure is correct it represents linked I/C contacts which is plausible — confirm the query filter matches that intent. | Medium | `[ ]` |
+| 16 | Registry Parity | Investigate `address_confirmed_undeliverable` denominator — observed 39 / 13,015. With ~58K linked contacts the denominator should be ~58K unless the metric intentionally scopes to a sub-population (e.g., contacts with a non-null physical address). Review the query and confirm the denominator is the intended base population; correct if it is unintentionally filtering. | Medium | `[ ]` |
+| 17 | Field Quality | Expand valid-value lists for `suffix_unrecognized`, `title_unrecognized`, and `generation_unrecognized` — all three show high error rates at low total volume, suggesting the seed lists are too narrow rather than genuine data issues. Run `SELECT DISTINCT <field>, COUNT(*) FROM Equip.contact WHERE <field> IS NOT NULL GROUP BY <field> ORDER BY 2 DESC` for each field, review the distinct unrecognized values, and add legitimate values to the valid list in the snapshot code before treating these as actionable. | Medium | `[ ]` |
+| 18 | Field Quality | Add a new `placeholder_company_name` metric for B contacts — check for values like `N/A`, `NA`, `NONE`, `UNKNOWN`, `NOT APPLICABLE`, `BLANK` in the `company_name` field. Mirror the existing `placeholder_name` pattern check but scoped to company name only. | Medium | `[ ]` |
+| 19 | Field Quality | Expand `placeholder_name` check to include generic null-substitute strings — add `NONE`, `UNKNOWN`, `N/A`, `NA`, `NOT APPLICABLE` to the current pattern list that already covers `FIRSTNAME`, `FIRST NAME`, `FNAME`, `LASTNAME`, `LAST NAME`, `LNAME`. These are equally clear placeholder entries that should be treated as effectively missing. | Medium | `[ ]` |
 
 ---
 
@@ -216,7 +228,7 @@ Columns: **metric_name** (snapshot value) · **Label** (clean Power BI display n
 | `linked_count` | Linked Contacts | Count of active contacts with a matching `customer_cross_ref` entry | Sentinel entity ID 999999998 excluded |
 | `unlinked_count` | Unlinked Contacts | Count of active contacts with no `cross_ref` match | Complement of `linked_count`; denominator = all active contacts |
 | `ckc_id_no_cross_ref` | Ckc_Id Without Cross-Ref | Contacts that have a `Ckc_Id` value in EQUIP but no matching Registry linkage | Residual from Phase 1.1; denominator = contacts where `Ckc_Id IS NOT NULL` |
-| `type_mismatch_linkage` | Linkage Type Mismatch | Linked contacts where the linkage level (entity vs. contact) doesn't match the contact type (B/I vs. C) | C should link at entity level (`contact_id = 0`); B/I should link at contact level (`contact_id <> 0`). Logic under review — 90% rate observed. |
+| `type_mismatch_linkage` | Linkage Type Mismatch | Linked contacts where the linkage level (entity vs. contact) doesn't match the contact type (B/I vs. C) | C should have non-zero `contact_id` (linked as business contact); B/I should have `contact_id = 0` or null (entity-only linkage). Logic was previously inverted and has been corrected. |
 | `duplicate_entity_id` | Duplicate Entity IDs | Entity IDs in the Registry that are linked to 2+ distinct EQUIP contacts | Phase 6 cleanup targets; denominator = distinct entity IDs among linked contacts |
 | `orphan_cross_ref` | Orphan Cross-Ref Entries | `cross_ref` entries whose `cross_ref_number` has no matching active EQUIP contact | Must filter to `cross_ref_description = 'HUTSON INC Dealer XREF'` only — current query includes all cross-ref types and inflates the count |
 
@@ -247,7 +259,7 @@ Parity metrics are split into one row per outcome. Each `metric_name` follows th
 
 | metric_name | Label | Definition | Logic Notes |
 |---|---|---|---|
-| `phys_addr_certified_mismatch` | Certified Address Mismatch | Linked contacts where Registry has a USPS-certified address that differs from EQUIP | Denominator = linked contacts with `phys_postal_certified = 'Y'`; high-confidence signal that EQUIP is out of date |
+| `phys_addr_certified_mismatch` | Certified Address Mismatch | Linked contacts where Registry has a USPS-certified address that differs from EQUIP | Denominator = linked contacts with `phys_postal_certified = 'CERTIFIED'`; high-confidence signal that EQUIP is out of date |
 | `address_confirmed_undeliverable` | Confirmed Undeliverable Address | Linked contacts where Registry has flagged the physical or mailing address as undeliverable | `phys_undeliverable_ind = 'Y'` OR `mail_undeliverable_ind = 'Y'`; denominator = all linked contacts |
 | `registry_oob_equip_active` | Registry OOB, EQUIP Active | B contacts that Registry marks as out of business but EQUIP still shows as active | Candidate for EQUIP inactivation review |
 | `registry_deceased_equip_active` | Registry Deceased, EQUIP Active | I/C contacts that Registry marks as deceased but EQUIP still shows as active | Candidate for EQUIP inactivation review |

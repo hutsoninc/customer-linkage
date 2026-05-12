@@ -24,7 +24,7 @@ WITH active_linked AS (
         NULLIF(LTRIM(RTRIM(c.city)),           '') AS city,
         NULLIF(LTRIM(RTRIM(c.state)),          '') AS state,
         NULLIF(LTRIM(RTRIM(c.pcode)),          '') AS pcode,
-        ISNULL(NULLIF(LTRIM(RTRIM(c.country)), ''), 'US') AS country,
+        NULLIF(LTRIM(RTRIM(c.country)), '') AS country,
         -- Registry fields (customer_profile)
         NULLIF(LTRIM(RTRIM(cp.nm1_txt)),            '') AS reg_company_name,
         NULLIF(LTRIM(RTRIM(cp.first_nm)),           '') AS reg_first_name,
@@ -254,7 +254,7 @@ SELECT
     COUNT(*),
     SUM(COUNT(*)) OVER (PARTITION BY Business_Individual, creation_cohort)
 FROM active_linked
-WHERE phys_postal_certified = 'Y'
+WHERE phys_postal_certified = 'CERTIFIED'
   AND (
        UPPER(ISNULL(street, '')) <> UPPER(ISNULL(reg_street, ''))
     OR UPPER(ISNULL(city,   '')) <> UPPER(ISNULL(reg_city,   ''))

@@ -130,7 +130,7 @@ These columns exist in `DDP.customer_profile` — discovered via schema query 20
 
 | Column | Meaning |
 |---|---|
-| `phys_postal_certified` | USPS-certified physical address (Y/N) |
+| `phys_postal_certified` | USPS-certified physical address (`'CERTIFIED'` = certified; other values indicate the type of address issue or `NULL` = not evaluated) |
 | `phys_crtfc_dt` | Date physical address was certified |
 | `phys_undeliverable_ind` | Physical address confirmed undeliverable (Y/N) |
 | `mail_postal_certified` | USPS-certified mailing address |
@@ -138,7 +138,7 @@ These columns exist in `DDP.customer_profile` — discovered via schema query 20
 | `mail_undeliverable_ind` | Mailing address confirmed undeliverable |
 
 **Priority parity metrics:**
-1. Registry has `phys_postal_certified = 'Y'` AND physical address differs from EQUIP → high confidence EQUIP is out of date
+1. Registry has `phys_postal_certified = 'CERTIFIED'` AND physical address differs from EQUIP → high confidence EQUIP is out of date
 2. `phys_undeliverable_ind = 'Y'` or `mail_undeliverable_ind = 'Y'` on a linked contact → EQUIP has a bad address that Registry has confirmed
 
 #### Opt-Out Flags (also in `customer_profile`)

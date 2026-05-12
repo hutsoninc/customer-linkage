@@ -207,7 +207,7 @@ SELECT
     COUNT(*),
     SUM(COUNT(*)) OVER (PARTITION BY Business_Individual, creation_cohort)
 FROM active_linked
-WHERE phys_postal_certified = 'Y'
+WHERE phys_postal_certified = 'CERTIFIED'
   AND (
        UPPER(ISNULL(street, '')) <> UPPER(ISNULL(reg_street, ''))
     OR UPPER(ISNULL(city,   '')) <> UPPER(ISNULL(reg_city,   ''))

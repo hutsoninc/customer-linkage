@@ -182,10 +182,10 @@ Denominator = `SUM(COUNT(*)) OVER (PARTITION BY field_name, contact_type, sales_
 
 | metric_name | Condition | Denominator |
 |---|---|---|
-| `phys_addr_certified_mismatch` | `phys_postal_certified = 'Y'` AND any address field differs between EQUIP and Registry | Linked contacts where `phys_postal_certified = 'Y'` in that dim slice |
+| `phys_addr_certified_mismatch` | `phys_postal_certified = 'CERTIFIED'` AND any address field differs between EQUIP and Registry | Linked contacts where `phys_postal_certified = 'CERTIFIED'` in that dim slice |
 | `address_confirmed_undeliverable` | `phys_undeliverable_ind = 'Y'` OR `mail_undeliverable_ind = 'Y'` | All linked contacts in that dim slice |
 
-Priority row denominators require a second pass over `active_linked` (unfiltered) to get the correct base per dim combination. Implementation: pre-aggregate `active_linked` into a supporting CTE before the final UNION ALL — one that counts (a) all linked contacts per dim slice and (b) linked contacts with `phys_postal_certified = 'Y'` per dim slice — then join those counts in as the denominator.
+Priority row denominators require a second pass over `active_linked` (unfiltered) to get the correct base per dim combination. Implementation: pre-aggregate `active_linked` into a supporting CTE before the final UNION ALL — one that counts (a) all linked contacts per dim slice and (b) linked contacts with `phys_postal_certified = 'CERTIFIED'` per dim slice — then join those counts in as the denominator.
 
 **Registry status vs. EQUIP active status (priority rows):**
 
@@ -335,7 +335,7 @@ Denominator: `SUM(COUNT(*)) OVER (PARTITION BY Business_Individual, sales_decile
 | 4 duplicate `active_contacts` CTEs with varying field lists | Single consolidated `active_contacts` CTE carries all fields needed by any section |
 | Each individual file uses `CAST(GETDATE() AS date)` independently | Still computed inline per section (no behavioral change — all execute within the same query run) |
 | Completeness: address/phone/email use `contact_type = 'ALL'` | Changed to `Business_Individual AS contact_type` to enable full dimensional slicing (Option A) |
-| Priority parity denominators (cert mismatch, undeliverable) always 100% — window function partitioned same as GROUP BY | Fixed: cert mismatch denominator = linked contacts with `phys_postal_certified = 'Y'` per dim slice; undeliverable denominator = all linked contacts per dim slice. Requires a pre-aggregated `linked_counts` CTE in Tier 3. |
+| Priority parity denominators (cert mismatch, undeliverable) always 100% — window function partitioned same as GROUP BY | Fixed: cert mismatch denominator = linked contacts with `phys_postal_certified = 'CERTIFIED'` per dim slice; undeliverable denominator = all linked contacts per dim slice. Requires a pre-aggregated `linked_counts` CTE in Tier 3. |
 | `duplicate_entity_id` denominator = total active contacts — unrelated population | Fixed: denominator = `COUNT(DISTINCT entity_id)` among linked contacts. Rate now reads "X% of linked entity IDs have multiple EQUIP contacts." |
 
 ---

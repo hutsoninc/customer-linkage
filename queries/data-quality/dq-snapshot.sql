@@ -226,6 +226,7 @@ contact_linkage AS (
         LEFT JOIN [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref] xr
             ON UPPER(xr.cross_ref_number) = UPPER(ce.contact_code)
            AND xr.entity_id <> 999999998
+           AND xr.cross_ref_description = 'HUTSON INC Dealer XREF'
 ),
 unlinked_enriched AS (
     SELECT ce.*
@@ -235,6 +236,7 @@ unlinked_enriched AS (
         FROM [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref] xr
         WHERE UPPER(xr.cross_ref_number) = UPPER(ce.contact_code)
           AND xr.entity_id <> 999999998
+          AND xr.cross_ref_description = 'HUTSON INC Dealer XREF'
     )
 ),
 active_linked AS (
@@ -256,7 +258,7 @@ active_linked AS (
         ce.city,
         ce.state,
         ce.pcode,
-        ISNULL(ce.country, 'US')                              AS country,
+        ce.country,
         NULLIF(LTRIM(RTRIM(cp.nm1_txt)),             '') AS reg_company_name,
         NULLIF(LTRIM(RTRIM(cp.first_nm)),            '') AS reg_first_name,
         NULLIF(LTRIM(RTRIM(cp.last_nm)),             '') AS reg_last_name,
@@ -475,7 +477,7 @@ linked_counts AS (
         branch,
         creation_cohort,
         COUNT(*)                                                       AS total_linked,
-        SUM(CASE WHEN phys_postal_certified = 'Y' THEN 1 ELSE 0 END) AS certified_linked
+        SUM(CASE WHEN phys_postal_certified = 'CERTIFIED' THEN 1 ELSE 0 END) AS certified_linked
     FROM active_linked
     GROUP BY Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort
 ),
@@ -484,6 +486,101 @@ dup_codes AS (
     FROM contact_enriched
     GROUP BY UPPER(LTRIM(RTRIM(contact_code)))
     HAVING COUNT(*) > 1
+),
+fp_denominator AS (
+    SELECT field_name, contact_type, sales_decile, staleness_bucket, branch, creation_cohort,
+           COUNT(*) AS denominator
+    FROM field_parity
+    GROUP BY field_name, contact_type, sales_decile, staleness_bucket, branch, creation_cohort
+),
+fp_numerator AS (
+    SELECT field_name, parity_result, contact_type, sales_decile, staleness_bucket, branch, creation_cohort,
+           COUNT(*) AS numerator
+    FROM field_parity
+    GROUP BY field_name, parity_result, contact_type, sales_decile, staleness_bucket, branch, creation_cohort
+),
+parity_outcomes AS (
+    SELECT 'match'         AS parity_result UNION ALL
+    SELECT 'mismatch'                       UNION ALL
+    SELECT 'equip_only'                     UNION ALL
+    SELECT 'registry_only'                  UNION ALL
+    SELECT 'both_null'
+),
+fp_spine AS (
+    SELECT d.field_name, po.parity_result, d.contact_type,
+           d.sales_decile, d.staleness_bucket, d.branch, d.creation_cohort,
+           d.denominator
+    FROM fp_denominator d
+    CROSS JOIN parity_outcomes po
+),
+staleness_buckets AS (
+    SELECT 'No Account'       AS staleness_bucket UNION ALL
+    SELECT 'Never Transacted'                     UNION ALL
+    SELECT '0-1yr'                                UNION ALL
+    SELECT '1-2yr'                                UNION ALL
+    SELECT '2-3yr'                                UNION ALL
+    SELECT '3-4yr'                                UNION ALL
+    SELECT '4-5yr'                                UNION ALL
+    SELECT '5+yr'
+),
+s5_denominator AS (
+    SELECT Business_Individual, sales_decile, branch, creation_cohort,
+           COUNT(*) AS denominator
+    FROM contact_enriched
+    GROUP BY Business_Individual, sales_decile, branch, creation_cohort
+),
+s5_numerator AS (
+    SELECT staleness_bucket, Business_Individual, sales_decile, branch, creation_cohort,
+           COUNT(*) AS numerator
+    FROM contact_enriched
+    GROUP BY staleness_bucket, Business_Individual, sales_decile, branch, creation_cohort
+),
+s5_spine AS (
+    SELECT d.Business_Individual, d.sales_decile, d.branch, d.creation_cohort,
+           sb.staleness_bucket, d.denominator
+    FROM s5_denominator d
+    CROSS JOIN staleness_buckets sb
+),
+match_readiness_tiers AS (
+    SELECT 1 AS tier, 'tier_1_strong'    AS metric_name UNION ALL
+    SELECT 2,         'tier_2_partial'                  UNION ALL
+    SELECT 3,         'tier_3_name_only'                UNION ALL
+    SELECT 4,         'tier_4_no_name'
+),
+s6_tiered AS (
+    SELECT
+        Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort,
+        CASE
+            WHEN (Business_Individual IN ('I','C') AND (first_name IS NULL OR last_name IS NULL))
+              OR (Business_Individual = 'B'        AND company_name IS NULL)
+                THEN 4
+            WHEN (street IS NOT NULL AND city IS NOT NULL AND state IS NOT NULL)
+              OR (street IS NOT NULL AND pcode IS NOT NULL)
+                THEN 1
+            WHEN (street IS NOT NULL OR city IS NOT NULL OR state IS NOT NULL OR pcode IS NOT NULL)
+              OR (biz_phone IS NOT NULL OR priv_phone IS NOT NULL OR mob_phone IS NOT NULL OR email IS NOT NULL)
+                THEN 2
+            ELSE 3
+        END AS tier
+    FROM unlinked_enriched
+),
+s6_denominator AS (
+    SELECT Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort,
+           COUNT(*) AS denominator
+    FROM unlinked_enriched
+    GROUP BY Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort
+),
+s6_numerator AS (
+    SELECT tier, Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort,
+           COUNT(*) AS numerator
+    FROM s6_tiered
+    GROUP BY tier, Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort
+),
+s6_spine AS (
+    SELECT d.Business_Individual, d.sales_decile, d.staleness_bucket, d.branch, d.creation_cohort,
+           t.tier, t.metric_name, d.denominator
+    FROM s6_denominator d
+    CROSS JOIN match_readiness_tiers t
 )
 
 /* ═══════════════════════════════════════════════════════
@@ -560,9 +657,11 @@ SELECT
     'ALL', 'ALL', 'ALL', NULL, 'ALL',
     COUNT(*),
     (SELECT COUNT(*) FROM [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref]
-     WHERE entity_id <> 999999998)
+     WHERE entity_id <> 999999998
+       AND cross_ref_description = 'HUTSON INC Dealer XREF')
 FROM [Bronze_Production_Lakehouse].[DDP].[customer_cross_ref] xr_all
 WHERE xr_all.entity_id <> 999999998
+  AND xr_all.cross_ref_description = 'HUTSON INC Dealer XREF'
   AND NOT EXISTS (
       SELECT 1 FROM contact_enriched ce
       WHERE UPPER(ce.contact_code) = UPPER(xr_all.cross_ref_number)
@@ -577,18 +676,23 @@ UNION ALL
 SELECT
     CAST(GETDATE() AS date),
     'parity',
-    field_name + '_' + parity_result,
-    contact_type,
-    sales_decile,
-    staleness_bucket,
-    branch,
-    creation_cohort,
-    COUNT(*),
-    SUM(COUNT(*)) OVER (
-        PARTITION BY field_name, contact_type, sales_decile, staleness_bucket, branch, creation_cohort
-    )
-FROM field_parity
-GROUP BY field_name, parity_result, contact_type, sales_decile, staleness_bucket, branch, creation_cohort
+    fs.field_name + '_' + fs.parity_result,
+    fs.contact_type,
+    fs.sales_decile,
+    fs.staleness_bucket,
+    fs.branch,
+    fs.creation_cohort,
+    ISNULL(fn.numerator, 0),
+    fs.denominator
+FROM fp_spine fs
+    LEFT JOIN fp_numerator fn
+        ON  fn.field_name       = fs.field_name
+        AND fn.parity_result    = fs.parity_result
+        AND fn.contact_type     = fs.contact_type
+        AND fn.sales_decile     = fs.sales_decile
+        AND fn.staleness_bucket = fs.staleness_bucket
+        AND ISNULL(fn.branch, '') = ISNULL(fs.branch, '')
+        AND fn.creation_cohort  = fs.creation_cohort
 
 UNION ALL
 
@@ -604,7 +708,7 @@ FROM active_linked al
         AND lc.staleness_bucket    = al.staleness_bucket
         AND ISNULL(lc.branch, '') = ISNULL(al.branch, '')
         AND lc.creation_cohort     = al.creation_cohort
-WHERE al.phys_postal_certified = 'Y'
+WHERE al.phys_postal_certified = 'CERTIFIED'
   AND (
        UPPER(ISNULL(al.street, '')) <> UPPER(ISNULL(al.reg_street, ''))
     OR UPPER(ISNULL(al.city,   '')) <> UPPER(ISNULL(al.reg_city,   ''))
@@ -1141,88 +1245,71 @@ GROUP BY sq.metric_name, sq.contact_type, sq.sales_decile, sq.staleness_bucket, 
 
 UNION ALL
 
--- ── contact_code: normalized duplicates (separate — requires subquery reference) ──
+-- ── contact_code: normalized duplicates — left join so every dim slice emits a row ──
 SELECT
     CAST(GETDATE() AS date), 'field_quality', 'contact_code_duplicate_normalized',
     ce.Business_Individual, ce.sales_decile, ce.staleness_bucket, ce.branch, ce.creation_cohort,
-    COUNT(*),
-    (SELECT COUNT(*) FROM contact_enriched)
+    SUM(CASE WHEN dc.norm_code IS NOT NULL THEN 1 ELSE 0 END),
+    COUNT(*)
 FROM contact_enriched ce
-WHERE UPPER(LTRIM(RTRIM(ce.contact_code))) IN (SELECT norm_code FROM dup_codes)
+    LEFT JOIN dup_codes dc ON dc.norm_code = UPPER(LTRIM(RTRIM(ce.contact_code)))
 GROUP BY ce.Business_Individual, ce.sales_decile, ce.staleness_bucket, ce.branch, ce.creation_cohort
 
 /* ═══════════════════════════════════════════════════════
    SECTION 5 — Staleness
    metric_name IS the bucket; staleness_bucket column = 'ALL'.
+   Spine: all 8 buckets × every dim slice so denominators are uniform
+   when Power BI rolls up — missing buckets get numerator = 0.
    ═══════════════════════════════════════════════════════ */
 
 UNION ALL
 
 SELECT
-    CAST(GETDATE() AS date) AS snapshot_date,
-    'staleness'             AS metric_category,
-    staleness_bucket        AS metric_name,
-    Business_Individual     AS contact_type,
-    sales_decile,
-    'ALL'                   AS staleness_bucket,
-    branch,
-    creation_cohort,
-    COUNT(*)                AS numerator,
-    SUM(COUNT(*)) OVER (
-        PARTITION BY Business_Individual, sales_decile, branch, creation_cohort
-    )                       AS denominator
-FROM contact_enriched
-GROUP BY staleness_bucket, Business_Individual, sales_decile, branch, creation_cohort
+    CAST(GETDATE() AS date)      AS snapshot_date,
+    'staleness'                  AS metric_category,
+    ss.staleness_bucket          AS metric_name,
+    ss.Business_Individual       AS contact_type,
+    ss.sales_decile,
+    'ALL'                        AS staleness_bucket,
+    ss.branch,
+    ss.creation_cohort,
+    ISNULL(sn.numerator, 0)      AS numerator,
+    ss.denominator
+FROM s5_spine ss
+    LEFT JOIN s5_numerator sn
+        ON  sn.staleness_bucket    = ss.staleness_bucket
+        AND sn.Business_Individual = ss.Business_Individual
+        AND sn.sales_decile        = ss.sales_decile
+        AND ISNULL(sn.branch, '')  = ISNULL(ss.branch, '')
+        AND sn.creation_cohort     = ss.creation_cohort
 
 /* ═══════════════════════════════════════════════════════
    SECTION 6 — Match Readiness
    Scope: unlinked active non-employee contacts only.
+   Spine: all 4 tiers × every dim slice so denominators are uniform
+   when Power BI rolls up — missing tiers get numerator = 0.
    ═══════════════════════════════════════════════════════ */
 
 UNION ALL
 
 SELECT
-    CAST(GETDATE() AS date) AS snapshot_date,
-    'match_readiness'       AS metric_category,
-    CASE tier
-        WHEN 1 THEN 'tier_1_strong'
-        WHEN 2 THEN 'tier_2_partial'
-        WHEN 3 THEN 'tier_3_name_only'
-        WHEN 4 THEN 'tier_4_no_name'
-    END                     AS metric_name,
-    Business_Individual     AS contact_type,
-    sales_decile,
-    staleness_bucket,
-    branch,
-    creation_cohort,
-    COUNT(*)                AS numerator,
-    SUM(COUNT(*)) OVER (
-        PARTITION BY Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort
-    )                       AS denominator
-FROM (
-    SELECT
-        Business_Individual,
-        sales_decile,
-        staleness_bucket,
-        branch,
-        creation_cohort,
-        CASE
-            WHEN -- no usable name
-                 (Business_Individual IN ('I','C') AND (first_name IS NULL OR last_name IS NULL))
-              OR (Business_Individual = 'B'        AND company_name IS NULL)
-                THEN 4
-            WHEN -- name + full address
-                 (street IS NOT NULL AND city IS NOT NULL AND state IS NOT NULL)
-              OR (street IS NOT NULL AND pcode IS NOT NULL)
-                THEN 1
-            WHEN -- name + partial address or any contact info
-                 (street IS NOT NULL OR city IS NOT NULL OR state IS NOT NULL OR pcode IS NOT NULL)
-              OR (biz_phone IS NOT NULL OR priv_phone IS NOT NULL OR mob_phone IS NOT NULL OR email IS NOT NULL)
-                THEN 2
-            ELSE 3  -- name only
-        END AS tier
-    FROM unlinked_enriched
-) tiered
-GROUP BY tier, Business_Individual, sales_decile, staleness_bucket, branch, creation_cohort
+    CAST(GETDATE() AS date)      AS snapshot_date,
+    'match_readiness'            AS metric_category,
+    ss.metric_name,
+    ss.Business_Individual       AS contact_type,
+    ss.sales_decile,
+    ss.staleness_bucket,
+    ss.branch,
+    ss.creation_cohort,
+    ISNULL(sn.numerator, 0)      AS numerator,
+    ss.denominator
+FROM s6_spine ss
+    LEFT JOIN s6_numerator sn
+        ON  sn.tier                = ss.tier
+        AND sn.Business_Individual = ss.Business_Individual
+        AND sn.sales_decile        = ss.sales_decile
+        AND sn.staleness_bucket    = ss.staleness_bucket
+        AND ISNULL(sn.branch, '')  = ISNULL(ss.branch, '')
+        AND sn.creation_cohort     = ss.creation_cohort
 
 ORDER BY metric_category, metric_name, contact_type, sales_decile, staleness_bucket, branch, creation_cohort;
