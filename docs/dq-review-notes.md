@@ -400,8 +400,8 @@ Authoritative values for the four slicer dimension tables (Action Item #20). Eac
 | id | label | description | sort_order |
 |---|---|---|---|
 | `B` | Business | Company or organization contact | 1 |
-| `I` | Individual | Person contact not associated with a business entity | 2 |
-| `C` | Contact | Person contact associated with a business entity | 3 |
+| `C` | Contact | Person contact associated with a business entity | 2 |
+| `I` | Individual | Person contact not associated with a business entity | 3 |
 | `ALL` | All Types | Aggregate across all contact types | 4 |
 
 ---
@@ -429,14 +429,14 @@ Authoritative values for the four slicer dimension tables (Action Item #20). Eac
 
 | id | label | description | sort_order |
 |---|---|---|---|
-| `No Account` | No Account | Contact has no `ArMaster_Customer` record | 1 |
-| `Never Transacted` | Never Transacted | Has an account but no transaction history in the rolling 60-month window | 2 |
-| `0-1yr` | Recent | Last transaction within the past 12 months | 3 |
-| `1-2yr` | Lapsing — 1–2 Years | Last transaction 1–2 years ago | 4 |
-| `2-3yr` | Lapsing — 2–3 Years | Last transaction 2–3 years ago | 5 |
-| `3-4yr` | At Risk — 3–4 Years | Last transaction 3–4 years ago | 6 |
-| `4-5yr` | At Risk — 4–5 Years | Last transaction 4–5 years ago | 7 |
-| `5+yr` | Stale — 5+ Years | Last transaction more than 5 years ago; primary inactivation candidates | 8 |
+| `0-1yr` | <1 Year | Last transaction within the past 12 months | 1 |
+| `1-2yr` | 1–2 Years | Last transaction 1–2 years ago | 2 |
+| `2-3yr` | 2–3 Years | Last transaction 2–3 years ago | 3 |
+| `3-4yr` | 3–4 Years | Last transaction 3–4 years ago | 4 |
+| `4-5yr` | 4–5 Years | Last transaction 4–5 years ago | 5 |
+| `5+yr` | 5+ Years | Last transaction more than 5 years ago; primary inactivation candidates | 6 |
+| `never_transacted` | Never Transacted | Has an account but no transaction history in the rolling 60-month window | 7 |
+| `no_account` | No Account | Contact has no `ArMaster_Customer` record | 8 |
 | `ALL` | All Buckets | Aggregate across all staleness buckets | 9 |
 
 ---
@@ -447,7 +447,7 @@ Joins to parity `metric_name` on the prefix before the last `_<outcome>` segment
 
 | id | label | description | sort_order |
 |---|---|---|---|
-| `company_name` | Company Name | EQUIP `company_name` vs. Registry `nm1_txt`; B contacts (C scope under review — Action Item #8) | 1 |
+| `company_name` | Company Name | EQUIP `company_name` vs. Registry `nm1_txt`; B and C contacts | 1 |
 | `first_name` | First Name | EQUIP `name` vs. Registry `first_nm`; I and C contacts | 2 |
 | `last_name` | Last Name | EQUIP `surname` vs. Registry `last_nm`; I and C contacts | 3 |
 | `email` | Email | EQUIP `email_address` vs. Registry `email_addr_txt`; all contact types | 4 |
@@ -457,7 +457,7 @@ Joins to parity `metric_name` on the prefix before the last `_<outcome>` segment
 | `street` | Street | EQUIP `street` vs. Registry `phys_street1_txt`; all contact types | 8 |
 | `city` | City | EQUIP `city` vs. Registry `phys_city`; all contact types | 9 |
 | `state` | State | EQUIP `state` vs. Registry `phys_state_prov_cd`; all contact types | 10 |
-| `zip` | Zip Code | EQUIP `pcode` vs. Registry `phys_postal_cd` (first 5 digits — Action Item #11); all contact types | 11 |
+| `zip` | Zip Code | EQUIP `pcode` vs. Registry `phys_postal_cd`; all contact types | 11 |
 | `country` | Country | EQUIP `country` (US-defaulted) vs. Registry `phys_iso2_cntry_cd`; all contact types | 12 |
 
 ---
@@ -480,11 +480,11 @@ Joins to parity `metric_name` on the suffix after the last `_`. Example: `busine
 
 | id | label | description | sort_order |
 |---|---|---|---|
-| `Pre-2015` | Pre-2015 | Contact created in 2015 or earlier | 1 |
-| `2016-2020` | 2016–2020 | Contact created between 2016 and 2020 | 2 |
-| `2021-2025` | 2021–2025 | Contact created between 2021 and 2025 | 3 |
-| `2026+` | 2026 and Later | Contact created in 2026 or later | 4 |
-| `Unknown` | Unknown | Contact has no creation date recorded | 5 |
+| `Unknown` | Unknown | Contact has no creation date recorded | 1 |
+| `Pre-2015` | Pre-2015 | Contact created in 2015 or earlier | 2 |
+| `2016-2020` | 2016–2020 | Contact created between 2016 and 2020 | 3 |
+| `2021-2025` | 2021–2025 | Contact created between 2021 and 2025 | 4 |
+| `2026+` | 2026 and Later | Contact created in 2026 or later | 5 |
 | `ALL` | All Cohorts | Aggregate across all creation cohorts | 6 |
 
 ---
