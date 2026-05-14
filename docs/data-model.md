@@ -35,6 +35,11 @@ erDiagram
         string  In_House_Account_IND    "Undocumented flag — not in schema CSV"
     }
 
+    EQUIP_APMASTER {
+        int     ACC_NO              PK  "Vendor account number — PK"
+        string  CONTACT_CODE        FK  "-> EQUIP_contact.contact_code"
+    }
+
     EQUIP_WKMECHFL {
         string  Code                PK  "= contact_code (service technician)"
         string  is_terminated           "Y/N"
@@ -71,6 +76,7 @@ erDiagram
     EQUIP_contact           ||--||  EQUIP_ArMaster_Customer  : "contact_code = CONTACT_CODE | 1:1 confirmed"
     EQUIP_ArMaster          ||--||  EQUIP_ArMaster_Customer  : "ACC_NO = BILL_TO_ACC"
     EQUIP_contact           ||--o|  DDP_customer_cross_ref   : "contact_code = cross_ref_number"
+    EQUIP_contact           ||--o|  EQUIP_APMASTER           : "contact_code = CONTACT_CODE | vendors"
     EQUIP_contact           ||--o|  EQUIP_WKMECHFL           : "contact_code = Code | technicians"
     EQUIP_contact           ||--o|  EQUIP_VhSalman           : "contact_code = CODE | salespersons"
     DDP_customer_cross_ref  }o--||  DDP_customer_profile     : "entity_id"
@@ -87,10 +93,13 @@ erDiagram
 | EQUIP_contact → EQUIP_ArMaster_Customer | **1:1** | `CONTACT_CODE` is NOT NULL. Confirmed across all 524,971 accounts. This is the primary contact→account join table. |
 | EQUIP_ArMaster → EQUIP_ArMaster_Customer | **1:1** | Join: `ArMaster.ACC_NO = ArMaster_Customer.BILL_TO_ACC`. `Customer_No` equals `BILL_TO_ACC` on 99.996% of rows (525,180 / 525,203) — 23 consolidated-billing exceptions. Current query joins on `Customer_No`; negligible impact. |
 | EQUIP_contact → DDP_customer_cross_ref | **1:0..1** | A contact may or may not be formally linked. Each contact_code appears at most once in cross_ref. |
+| EQUIP_contact → EQUIP_APMASTER | **1:0..1** | Accounts Payable master — vendor accounts. `CONTACT_CODE` joins to `contact.contact_code`. Exclude from customer upload queries. |
 | EQUIP_contact → EQUIP_WKMECHFL | **1:0..1** | 1,787 technician records; 1,768 (99%) join to a contact. `Code` = contact_code. Exclude from all upload queries. |
 | EQUIP_contact → EQUIP_VhSalman | **1:0..1** | 2,468 salesperson records; 2,435 (99%) join to a contact. `CODE` = contact_code. Exclude from all upload queries. |
 | DDP_customer_cross_ref → DDP_customer_profile | **N:1** | Multiple EQUIP contacts can link to the same Registry entity (603 cases confirmed — these are duplicates in EQUIP). `customer_profile` rows are also keyed by `cross_ref_description` — always filter to `'HUTSON INC Dealer XREF'` to avoid duplicate rows from EDA source (see convention rule 12). |
 | EQUIP_ArMaster → Salesforce_Account | **1:0..1** | Salesforce Customer records sync from EQUIP. Not all EQUIP accounts have a Salesforce record. Prospect accounts have no account number and no EQUIP record. |
+
+**AR / AP account association:** A contact may be associated with an AR account (`ArMaster`), an AP account (`APMASTER`), both, or neither. The two relationships are independent — having one does not imply the other.
 
 ---
 

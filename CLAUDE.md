@@ -72,6 +72,7 @@ Full patterns with examples in `docs/query-conventions.md`. Summary:
 | `Equip.contact` | EQUIP | `contact_code` PK, `Business_Individual` B/I/C, `Ckc_Id`, `Cmp_Ckc_Id` |
 | `Equip.ArMaster` | EQUIP | `ACC_NO` PK (= Salesforce `Anvil__AccountNumber__c`), `contact_code` FK (nullable) — financial master: balances, credit, aging |
 | `Equip.ArMaster_Customer` | EQUIP | `contact_code` FK NOT NULL, `BILL_TO_ACC` → ArMaster.ACC_NO, `Customer_No` alt ref, `TERRITORY` branch — 1:1 with contact |
+| `Equip.APMASTER` | EQUIP | `ACC_NO` PK (vendor account number), `CONTACT_CODE` FK — Accounts Payable/vendor master; exclude from uploads |
 | `Equip.WKMECHFL` | EQUIP | `Code` = contact_code (technicians) — exclude from uploads |
 | `Equip.VhSalman` | EQUIP | `CODE` = contact_code (salespersons) — exclude from uploads |
 | `DDP.customer_cross_ref` | Registry | `cross_ref_number` (ALL CAPS = contact_code), `entity_id`, `contact_id`, `cross_ref_created_ts` |
