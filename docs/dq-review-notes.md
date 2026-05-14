@@ -155,7 +155,7 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 
 | Status | Bucket | Finding | Follow-up |
 |---|---|---|---|
-| `[!]` | `No Account` — contact has no ArMaster record | ~100% issue rate (69,192 / 69,224) — informational, not an issue metric | Mixed denominators across all staleness buckets — same aggregation problem as match readiness; investigate window function partition |
+| `[!]` | `No Account` — contact has no ArMaster record | ~100% issue rate (69,192 / 69,224) — informational, not an issue metric | Mixed denominators across all staleness buckets — same aggregation problem as match readiness; investigate window function partition. See Action Item #22 — vendor-only contacts (linked to an AP master but no AR master) are inflating this bucket and should be excluded |
 | `[!]` | `Never Transacted` — has ArMaster, no transaction history | Informational, not an issue metric | Verify query is scoped to contacts with an account only — should exclude No Account contacts; confirm the join to last_tx correctly returns NULL only for contacts where an ArMaster record exists but no transaction rows are found |
 | `[!]` | `0-1yr` | Informational | Mixed denominator values |
 | `[!]` | `1-2yr` | Informational | Mixed denominator values |
@@ -197,17 +197,20 @@ Consolidated list of follow-up tasks surfaced during review. Add rows as you go.
 | 4 | Staleness | Verify `Never Transacted` is scoped to contacts with an ArMaster record only — the `last_tx` LEFT JOIN returns NULL for both no-account contacts and contacts with an account but no transactions; confirm the bucket assignment logic separates these two cases correctly | Medium | `[x]` |
 | 2 | Metric Dim | Add an `is_issue` flag to the metric dimension table to distinguish true issue metrics (numerator = problem count, drives issue rate) from informational metrics (e.g., `linked_count` — not a problem, but muddies a global issue rate if included). Power BI issue rate measure should filter to `is_issue = true` before dividing numerator by denominator. | Medium | `[x]` |
 | 9 | Registry Parity | Verify outcome totals equal denominator for every parity field. For each field and dimension slice, the sum of all five outcomes (match + mismatch + equip_only + registry_only + both_null) should equal the denominator. Query the snapshot table grouping by `metric_name` prefix and dim columns, sum numerators across all five outcome suffixes, and confirm the total matches the stored denominator. Flag any field where they diverge — indicates a contact is being double-counted or dropped. Apply the same total-must-equal-denominator check to other metric categories as well. | Medium | `[x]` |
-| 8 | Registry Parity | Expand business field parity scope to include C contact types. `company_name` currently filters to `Business_Individual = 'B'` only — denominator was only 144, suggesting most business contacts (C type) are excluded. C contacts are linked to a business entity and also carry company names. Evaluate whether `company_name` and other fields shared by businesses and their contacts (`street`, `city`, `state`, `zip`, `country`) should include `Business_Individual IN ('B', 'C')` in their scope filter. | Medium | `[ ]` |
+| 8 | Registry Parity | Expand business field parity scope to include C contact types. `company_name` currently filters to `Business_Individual = 'B'` only — denominator was only 144, suggesting most business contacts (C type) are excluded. C contacts are linked to a business entity and also carry company names. Evaluate whether `company_name` and other fields shared by businesses and their contacts (`street`, `city`, `state`, `zip`, `country`) should include `Business_Individual IN ('B', 'C')` in their scope filter. | Medium | `[x]` |
 | 10 | Registry Parity | Evaluate dropping `phys_addr_certified_mismatch` — near-100% issue rate. Exact-string equality between EQUIP and a USPS-certified Registry address will almost never match without copying Registry data directly into EQUIP. Low actionability as a mismatch metric. Consider replacing with an informational flag ("has USPS-certified Registry address") rather than a parity check. | Low | `[ ]` |
-| 11 | Registry Parity | Fix `zip_*` parity comparison to compare only the first 5 digits — Registry stores ZIP+4 (e.g., `42101-1234`) while EQUIP typically stores 5-digit zip only. Exact equality artificially inflates the mismatch rate. Change the parity logic to compare `LEFT(pcode, 5)` vs `LEFT(reg_pcode, 5)` (T-SQL) or `SUBSTRING(pcode, 1, 5)` (PySpark). | Medium | `[ ]` |
-| 12 | Field Quality | Update `zip_not_5digits` metric to accept 5-digit OR 9-digit (ZIP+4) as valid — currently flags all ZIP+4 values as invalid. A 9-digit zip matching `NNNNN-NNNN` or `NNNNNNNNN` is a valid format and should not be counted as an issue. Related to Action Item #11. | Low | `[ ]` |
+| 11 | Registry Parity | Fix `zip_*` parity comparison to compare only the first 5 digits — Registry stores ZIP+4 (e.g., `42101-1234`) while EQUIP typically stores 5-digit zip only. Exact equality artificially inflates the mismatch rate. Change the parity logic to compare `LEFT(pcode, 5)` vs `LEFT(reg_pcode, 5)` (T-SQL) or `SUBSTRING(pcode, 1, 5)` (PySpark). | Medium | `[x]` |
+| 12 | Field Quality | Update `zip_not_5digits` metric to accept 5-digit OR 9-digit (ZIP+4) as valid — currently flags all ZIP+4 values as invalid. A 9-digit zip matching `NNNNN-NNNN` or `NNNNNNNNN` is a valid format and should not be counted as an issue. Related to Action Item #11. | Low | `[x]` |
 | 13 | Registry Parity | Re-examine `business_phone` parity — `equip_only` outcome at ~93% is very high. Verify the concatenation logic that combines Registry `work_area_cd` + `work_phone_num` produces the same format as EQUIP's `BusinessPhone` (10-digit, no separators). Possible issues: area code stored with separators, leading zeros dropped, or Registry returning empty string vs NULL for one component. | Medium | `[ ]` |
 | 14 | Linkage Quality | Investigate varying denominators across linkage metrics — `type_mismatch_linkage`, `duplicate_entity_id`, `orphan_cross_ref`, and `ckc_id_no_cross_ref` show denominators ranging from 58,778 to 58,831. Each metric likely uses a slightly different base population (e.g., all active contacts vs. linked-only vs. cross_ref entries). Document the intended denominator for each and confirm queries are using the correct scope. | Medium | `[ ]` |
 | 15 | Registry Parity | Verify denominator for `registry_deceased_equip_active` — observed 410 / 28,849. Confirm denominator is all linked active I/C contacts, not all Registry-marked-deceased contacts regardless of linkage or all inactive contacts. If the 28,849 figure is correct it represents linked I/C contacts which is plausible — confirm the query filter matches that intent. | Medium | `[ ]` |
 | 16 | Registry Parity | Investigate `address_confirmed_undeliverable` denominator — observed 39 / 13,015. With ~58K linked contacts the denominator should be ~58K unless the metric intentionally scopes to a sub-population (e.g., contacts with a non-null physical address). Review the query and confirm the denominator is the intended base population; correct if it is unintentionally filtering. | Medium | `[ ]` |
 | 17 | Field Quality | Expand valid-value lists for `suffix_unrecognized`, `title_unrecognized`, and `generation_unrecognized` — all three show high error rates at low total volume, suggesting the seed lists are too narrow rather than genuine data issues. Run `SELECT DISTINCT <field>, COUNT(*) FROM Equip.contact WHERE <field> IS NOT NULL GROUP BY <field> ORDER BY 2 DESC` for each field, review the distinct unrecognized values, and add legitimate values to the valid list in the snapshot code before treating these as actionable. | Medium | `[ ]` |
-| 18 | Field Quality | Add a new `placeholder_company_name` metric for B contacts — check for values like `N/A`, `NA`, `NONE`, `UNKNOWN`, `NOT APPLICABLE`, `BLANK` in the `company_name` field. Mirror the existing `placeholder_name` pattern check but scoped to company name only. | Medium | `[ ]` |
-| 19 | Field Quality | Expand `placeholder_name` check to include generic null-substitute strings — add `NONE`, `UNKNOWN`, `N/A`, `NA`, `NOT APPLICABLE` to the current pattern list that already covers `FIRSTNAME`, `FIRST NAME`, `FNAME`, `LASTNAME`, `LAST NAME`, `LNAME`. These are equally clear placeholder entries that should be treated as effectively missing. | Medium | `[ ]` |
+| 18 | Field Quality | Add a new `placeholder_company_name` metric for B contacts — check for values like `N/A`, `NA`, `NONE`, `UNKNOWN`, `NOT APPLICABLE`, `BLANK` in the `company_name` field. Mirror the existing `placeholder_name` pattern check but scoped to company name only. | Medium | `[x]` |
+| 19 | Field Quality | Expand `placeholder_name` check to include generic null-substitute strings — add `NONE`, `UNKNOWN`, `N/A`, `NA`, `NOT APPLICABLE` to the current pattern list that already covers `FIRSTNAME`, `FIRST NAME`, `FNAME`, `LASTNAME`, `LAST NAME`, `LNAME`. These are equally clear placeholder entries that should be treated as effectively missing. | Medium | `[x]` |
+| 20 | Report | Build slicer dimension tables in Power BI for `contact_type`, `sales_decile`, `staleness_bucket`, and `creation_cohort`. Each table needs: `id` (the value stored in the snapshot), `label` (clean display name), `description` (tooltip text), `sort_order` (integer for correct axis/slicer ordering). Values and labels defined in the Dimension Tables Reference section below. Use `sort_order` as the default sort on all slicer and axis visuals — do not rely on alphabetical sort. | Medium | `[ ]` |
+| 21 | Report | Build two parity-specific dimension tables for the Registry Parity section. (1) `parity_field` — maps the field prefix from `metric_name` (e.g., `business_phone`) to a clean display name (e.g., "Business Phone"), description (scope and source fields), and sort order. (2) `parity_outcome` — maps the outcome suffix (e.g., `equip_only`) to a clean label (e.g., "EQUIP Only"), description, and sort order. These allow the parity matrix visual to use readable axis labels and slice by field or outcome independently. Values defined in the Dimension Tables Reference section below. | Medium | `[ ]` |
+| 22 | Staleness | Exclude vendor-only contacts from the `no_account` staleness bucket. Contacts linked to an AP master record but with no AR master (`ArMaster_Customer`) are not expected to have an AR account and should not appear in `no_account` — they are not customers. Identify the EQUIP table that tracks AP/vendor relationships, then add a LEFT JOIN + `IS NULL` exclusion in `contact_enriched` (or in the staleness tier assignment) to filter them out before the staleness bucket is assigned. | Medium | `[ ]` |
 
 ---
 
@@ -364,7 +367,7 @@ The `metric_name` in the snapshot IS the staleness bucket value. All active non-
 |---|---|---|---|
 | `No Account` | No Account | Contact has no `ArMaster_Customer` record | May be data entry orphans, unfinished records, or structurally expected for some contact types. Investigate by B/I/C breakdown. |
 | `Never Transacted` | Never Transacted | Contact has an `ArMaster` record but no transaction history in the revenue dataset | Different from No Account — account exists but was never used |
-| `0-1yr` | Active — Last Year | Last transaction within the past 12 months | Healthy active customer baseline |
+| `0-1yr` | Recent | Last transaction within the past 12 months | Healthy active customer baseline; labeled "Recent" to avoid conflict with EQUIP's `Inactive_Indicator` active/inactive status |
 | `1-2yr` | Lapsing — 1–2 Years | Last transaction 1–2 years ago | Worth monitoring |
 | `2-3yr` | Lapsing — 2–3 Years | Last transaction 2–3 years ago | |
 | `3-4yr` | At Risk — 3–4 Years | Last transaction 3–4 years ago | |
@@ -383,6 +386,106 @@ Scope: unlinked active contacts only.
 | `tier_2_partial` | Tier 2 — Partial Match Candidate | Has usable name AND partial address or at least one contact method | Potential match possible; outcome depends on Registry data quality |
 | `tier_3_name_only` | Tier 3 — Name Only | Has usable name but no address and no contact info | Unlikely to match without data enrichment |
 | `tier_4_no_name` | Tier 4 — No Name | Missing the primary name field(s) for the contact type | Cannot attempt a match regardless of other fields |
+
+---
+
+## Dimension Tables Reference
+
+Authoritative values for the four slicer dimension tables (Action Item #20). Each table: `id` = value stored in `data_quality_snapshot`, `label` = Power BI display name, `description` = tooltip text, `sort_order` = integer for axis/slicer ordering.
+
+---
+
+### contact_type
+
+| id | label | description | sort_order |
+|---|---|---|---|
+| `B` | Business | Company or organization contact | 1 |
+| `I` | Individual | Person contact not associated with a business entity | 2 |
+| `C` | Contact | Person contact associated with a business entity | 3 |
+| `ALL` | All Types | Aggregate across all contact types | 4 |
+
+---
+
+### sales_decile
+
+| id | label | description | sort_order |
+|---|---|---|---|
+| `D1` | Decile 1 | Highest-revenue accounts — top 10% by rolling 60-month revenue | 1 |
+| `D2` | Decile 2 | 11–20% by rolling 60-month revenue | 2 |
+| `D3` | Decile 3 | 21–30% by rolling 60-month revenue | 3 |
+| `D4` | Decile 4 | 31–40% by rolling 60-month revenue | 4 |
+| `D5` | Decile 5 | 41–50% by rolling 60-month revenue | 5 |
+| `D6` | Decile 6 | 51–60% by rolling 60-month revenue | 6 |
+| `D7` | Decile 7 | 61–70% by rolling 60-month revenue | 7 |
+| `D8` | Decile 8 | 71–80% by rolling 60-month revenue | 8 |
+| `D9` | Decile 9 | 81–90% by rolling 60-month revenue | 9 |
+| `D10` | Decile 10 | Lowest-revenue accounts — bottom 10% by rolling 60-month revenue | 10 |
+| `Unranked` | Unranked | Contact's account has no revenue in the rolling 60-month window | 11 |
+| `ALL` | All Deciles | Aggregate across all deciles | 12 |
+
+---
+
+### staleness_bucket
+
+| id | label | description | sort_order |
+|---|---|---|---|
+| `No Account` | No Account | Contact has no `ArMaster_Customer` record | 1 |
+| `Never Transacted` | Never Transacted | Has an account but no transaction history in the rolling 60-month window | 2 |
+| `0-1yr` | Recent | Last transaction within the past 12 months | 3 |
+| `1-2yr` | Lapsing — 1–2 Years | Last transaction 1–2 years ago | 4 |
+| `2-3yr` | Lapsing — 2–3 Years | Last transaction 2–3 years ago | 5 |
+| `3-4yr` | At Risk — 3–4 Years | Last transaction 3–4 years ago | 6 |
+| `4-5yr` | At Risk — 4–5 Years | Last transaction 4–5 years ago | 7 |
+| `5+yr` | Stale — 5+ Years | Last transaction more than 5 years ago; primary inactivation candidates | 8 |
+| `ALL` | All Buckets | Aggregate across all staleness buckets | 9 |
+
+---
+
+### parity_field
+
+Joins to parity `metric_name` on the prefix before the last `_<outcome>` segment. Example: `business_phone_equip_only` → `parity_field.id = 'business_phone'`.
+
+| id | label | description | sort_order |
+|---|---|---|---|
+| `company_name` | Company Name | EQUIP `company_name` vs. Registry `nm1_txt`; B contacts (C scope under review — Action Item #8) | 1 |
+| `first_name` | First Name | EQUIP `name` vs. Registry `first_nm`; I and C contacts | 2 |
+| `last_name` | Last Name | EQUIP `surname` vs. Registry `last_nm`; I and C contacts | 3 |
+| `email` | Email | EQUIP `email_address` vs. Registry `email_addr_txt`; all contact types | 4 |
+| `business_phone` | Business Phone | EQUIP `BusinessPhone` vs. Registry `work_area_cd` + `work_phone_num`; all contact types | 5 |
+| `private_phone` | Home Phone | EQUIP `PrivatePhone` vs. Registry `home_area_cd` + `home_phone_num`; all contact types | 6 |
+| `mobile_phone` | Mobile Phone | EQUIP `MobilePhone` vs. Registry `mobile_area_cd` + `mobile_phone_num`; all contact types | 7 |
+| `street` | Street | EQUIP `street` vs. Registry `phys_street1_txt`; all contact types | 8 |
+| `city` | City | EQUIP `city` vs. Registry `phys_city`; all contact types | 9 |
+| `state` | State | EQUIP `state` vs. Registry `phys_state_prov_cd`; all contact types | 10 |
+| `zip` | Zip Code | EQUIP `pcode` vs. Registry `phys_postal_cd` (first 5 digits — Action Item #11); all contact types | 11 |
+| `country` | Country | EQUIP `country` (US-defaulted) vs. Registry `phys_iso2_cntry_cd`; all contact types | 12 |
+
+---
+
+### parity_outcome
+
+Joins to parity `metric_name` on the suffix after the last `_`. Example: `business_phone_equip_only` → `parity_outcome.id = 'equip_only'`.
+
+| id | label | description | sort_order |
+|---|---|---|---|
+| `match` | Match | Both systems have a value and they are identical | 1 |
+| `mismatch` | Mismatch | Both systems have a value but they differ | 2 |
+| `equip_only` | EQUIP Only | EQUIP has a value; Registry field is null | 3 |
+| `registry_only` | Registry Only | Registry has a value; EQUIP field is null | 4 |
+| `both_null` | Both Null | Neither system has a value for this field | 5 |
+
+---
+
+### creation_cohort
+
+| id | label | description | sort_order |
+|---|---|---|---|
+| `Pre-2015` | Pre-2015 | Contact created in 2015 or earlier | 1 |
+| `2016-2020` | 2016–2020 | Contact created between 2016 and 2020 | 2 |
+| `2021-2025` | 2021–2025 | Contact created between 2021 and 2025 | 3 |
+| `2026+` | 2026 and Later | Contact created in 2026 or later | 4 |
+| `Unknown` | Unknown | Contact has no creation date recorded | 5 |
+| `ALL` | All Cohorts | Aggregate across all creation cohorts | 6 |
 
 ---
 
