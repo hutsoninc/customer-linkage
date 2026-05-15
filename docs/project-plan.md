@@ -1,7 +1,7 @@
 # Customer Linkage — Project Plan
 
 **Created:** 2026-04-28  
-**Status:** In Planning
+**Status:** In Progress (Phase 0 complete, Phase 1 underway)
 
 ---
 
@@ -9,18 +9,18 @@
 
 1. **Increase linkage** — Formally link EQUIP contacts to John Deere Registry (IKC/CKC) so our DBS number appears in CSC across all JD sales tools (JDQuote2, JDMint, Sales Center, Rewards, Warranty Portal, etc.) and downstream data (UCC filings, equipment history) becomes navigable by customer.
 2. **Clean and validate customer information** — Standardize EQUIP contact data to Registry conventions, remove stale records, and resolve data quality issues that prevent tight matching.
-3. **Merge duplicates** — Merge Salesforce Prospects into Customers where a sale has been made and the records diverged. Secondarily, merge confirmed duplicate contacts within EQUIP.
+3. **Merge duplicates** — Merge Salesforce Prospects into Customers where a sale has been made and the records diverged. Secondarily, merge confirmed duplicate contacts within EQUIP and clean up duplicate entity IDs in Deere's Registry.
+4. **Unlock downstream integrations** — Use Registry linkage as the foundation to connect with Customer Lead Generator (CLG), Operations Center org IDs, Expert Connect, and UCC/EDA filing data — enabling use cases such as lead filtering, lost sale alerting, and inbound call enrichment.
 
 ---
 
 ## Constraints
 
 - **No dedicated manual reviewer** — Potential matches from the Customer Linkage Tool require human judgment. Design all phases to maximize tight matches (auto-approved) and defer or route potential matches to account managers.
-- **Partner coordination required for EQUIP merges** — CustomerTRAX, Foresight, Sedona must merge their data in sync. Service Delivery work orders on the losing customer must be updated first. EQUIP merges also affect SVAP and JDParts.
+- **Partner coordination required for EQUIP merges** — Must work with Anvil to handle merges in Salesforce and ensure data is syncing properly.
 - **EQUIP merges are off-hours operations** — The Customer/Contact Merge program touches a large number of tables.
 - **Upload limits** — Customer Linkage Tool accepts max 6MB / ~60,000 rows per file. Multiple uploads required.
 - **Salesforce entity ID precedence** — `H_Equip_contact_Ckc_Id__c` (synced from EQUIP formal linkage) overwrites `Anvil__CustomerCompEntityID__c` (from quote workflow) when populated. Creating formal EQUIP linkages will auto-correct stale Anvil entity IDs through the normal sync.
-- **144 SF/cross_ref disagreements** — Do not include these records in any bulk operation without manual review first.
 
 ---
 
@@ -45,6 +45,24 @@ See `data-model.md` for table relationships and field semantics.
 ---
 
 ## Order of Operations
+
+---
+
+### Phase 0 — Data Quality Reporting Baseline
+**Effort:** Medium | **Risk:** Low | **Dependency:** None  
+**Status:** Complete (2026-05-15)  
+**Goal:** Establish a weekly snapshot pipeline and Power BI report to track data quality trends, surface cleanup targets, and provide a measurable before/after baseline for Phase 2.
+
+#### What was built
+
+- **Notebook** — `notebooks/dq-snapshot.ipynb` — primary artifact running in production as a scheduled weekly job. Executes all DQ metric logic across six sections (Linkage Quality, Registry Parity, Completeness, Field Quality, Staleness, Match Readiness) using a tiered CTE structure, then assembles and writes results. Defines all tables created by this phase:
+  - `data_quality_snapshot` — weekly-append fact table; aggregated counts by metric, contact type, sales decile, staleness bucket, branch, and creation cohort
+  - `contact_issues` — per-contact issue flags for drill-down; updated each run
+  - Metric and static dimension tables (written on `WRITE_DIM_TABLES` flag)
+- **Power BI report** — 8-page report (Executive Summary, Linkage Quality, Completeness, Field Quality, Registry Parity, Account Staleness, Match Readiness, Trends) sliceable by all aggregation dimensions
+- **First snapshot reviewed** — `docs/dq-review-notes.md` — metric-by-metric findings; query bugs fixed and re-run before marking complete
+
+See `docs/data-quality-plan.md` for full metric definitions, architecture, and aggregation dimension logic.
 
 ---
 
@@ -157,7 +175,7 @@ These Salesforce customers have an entity ID from the quote workflow but no form
 
 ### Phase 3 — Path B Bulk Upload (Unlinked Contacts)
 **Effort:** High | **Risk:** Low-Medium | **Dependency:** Phase 2 complete  
-**Goal:** Link the ~466,000 unlinked EQUIP accounts through the Customer Linkage Tool's match process.
+**Goal:** Link unlinked EQUIP accounts through the Customer Linkage Tool's match process, prioritizing high-value accounts and accepting only tight matches that also pass our internal validation checks. This is not a bulk dump of all ~466,000 unlinked records — accounts with poor data quality or ambiguous matches are deferred until data is corrected.
 
 #### Step 3.1 — Define Upload Batches
 Prioritize batches by value to maximize early impact:
@@ -173,7 +191,7 @@ Prioritize batches by value to maximize early impact:
 #### Step 3.3 — Upload and Process
 - Upload via Customer Linkage Tool → Match DBS Customer List
 - Monitor processing (~1 min per 500 records); email notification on completion
-- **Tight Match tab:** Accept all — click Create Linkage
+- **Tight Match tab:** Run reconciliation script to compare Deere's matched entity IDs against our Salesforce data and apply internal validation checks before accepting — do not accept all without review
 - **Review tab (Potential Matches):** Skip for now — defer to Phase 5
 
 #### Step 3.4 — Measure and Adjust
@@ -201,6 +219,19 @@ The root cause of 23,973 prospects: salespeople quote a prospect, make the sale,
 - Define a documented process for post-sale conversion: update EQUIP contact with entity ID → merge SF Prospect into Customer
 - Consider building a report or alert to surface Prospects with entity IDs that match a Customer account, prompting the merge
 
+#### Step 4.3 — Delete Orphaned Online Sales Lead Prospects
+Online sales leads create a Request in Salesforce and a linked Prospect account. If no quote was ever created against that Prospect, the record is effectively orphaned — it has no transactional history to preserve and often lacks enough data to match or merge to an existing Customer account.
+
+**Why clean these up:** These prospects add noise to the account list and cannot be productively acted on through the normal Phase 4.1 merge path. When migrating to SMO, they should not be carried in as Prospects — the intended model is to create Prospects only when actively quoting or ready to convert, not at lead-creation time.
+
+**Steps:**
+- Write query: SF Prospect accounts created from an online sales lead source, where no quote (`Anvil__Quote__c` or equivalent) has ever been created against the Prospect
+- For each qualifying Prospect, copy contact fields (name, phone, email, address) to the linked Request record so the contact information is retained in the lead history
+- Delete the Prospect accounts
+- Confirm the linked Requests are intact post-deletion
+
+**Risk note:** Deletion is irreversible — run the query as a dry-run count first and spot-check a sample before executing. Confirm with Anvil whether any SF automation fires on Prospect deletion that could affect the linked Request.
+
 ---
 
 ### Phase 5 — Manual Review Backlog
@@ -222,7 +253,7 @@ The root cause of 23,973 prospects: salespeople quote a prospect, make the sale,
 
 ### Phase 6 — EQUIP Customer → Customer Deduplication
 **Effort:** High | **Risk:** High | **Dependency:** Phases 1–3 complete  
-**Goal:** Merge the 603 confirmed duplicate EQUIP contacts (same Registry entity linked to 2+ EQUIP contact codes).
+**Goal:** Merge duplicate EQUIP customer records. The 599 contacts identified by contact-code-level matching (same Registry entity linked to 2+ EQUIP contact codes) are a confirmed subset — full deduplication across all active accounts will surface additional duplicates beyond what the contact-code method catches.
 
 #### Step 6.1 — Investigate Mixed-Type Cases First
 - Run block 2g query (written but not yet executed): inspect the 49 C+I mixed-type duplicates
@@ -249,19 +280,47 @@ Use "Delete After Merging" on the losing contact. Merge Contact Codes immediatel
 
 ### Phase 7 — Operations Center Org Reconciliation
 **Effort:** TBD | **Risk:** TBD | **Dependency:** Phases 1–4 complete  
-**Goal:** Link EQUIP accounts to John Deere Operations Center Organization IDs.
+**Goal:** Build a complete map between our EQUIP accounts, Deere's Registry entity IDs, and Operations Center Organization IDs.
 
-Operations Center uses Organization IDs which link to Registry Entity IDs via port IDs. Organizations can have multiple contacts, each with their own Entity ID.
+Operations Center uses Organization IDs which link to Registry Entity IDs via port IDs. Organizations can have multiple contacts, each with their own Entity ID. Establishing this mapping unlocks Operations Center data (machine telematics, field operations, agronomic records) navigable by our customer account.
 
 - Revisit once Registry linkage (Phases 1–3) is mature and coverage is high
 - Requires separate research into available datasets and the Org ID → Entity ID mapping
+- The full account map (EQUIP account → Registry entity → Org ID) is a foundational dataset for downstream analytics and future integrations
 - Treat as a distinct workstream
+
+---
+
+### Phase 8 — Expert Connect Enrichment
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phases 1–3 complete  
+**Goal:** Use Registry linkage to automatically enrich Expert Connect with customer name and contact information, eliminating the need for representatives to manually add it when a call comes in.
+
+Expert Connect currently shows phone numbers for the majority of inbound contacts but no name or account context. Representatives must manually look up or enter this information during or after the call.
+
+- With Registry linkage in place, the entity ID provides the bridge from phone number → Registry record → EQUIP account
+- Requires research into the Expert Connect data model and available integration points (API, flat file sync, or push from another system)
+- Outcome: inbound callers are identified automatically; account information is visible before the rep picks up
+
+---
+
+### Phase 9 — EDA Buyer ID Mapping and Lost Sale Alerts
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phases 1–3 complete  
+**Goal:** Leverage Deere's EDA buyer ID → entity ID mapping to connect UCC filing data to our customer accounts, enabling lost sale detection.
+
+Deere has provided an EDA buyer ID to entity ID mapping. UCC (Uniform Commercial Code) filings record equipment financing and are filed when a customer purchases equipment through a lender. If a UCC filing appears for a customer linked to our account but the sale did not go through us, that is a lost sale.
+
+- With sufficient Registry linkage coverage, we can join: EQUIP account → Registry entity ID → EDA buyer ID → UCC filing
+- Compare UCC filings against our own sales history to identify equipment purchases made elsewhere
+- Surface these as alerts to the Regional Customer Account Manager (RCAM) responsible for that account — a real-time lost sale report
+- Prioritize by account value (sales decile from DQ report) to focus RCAM attention on high-value accounts first
+- Requires confirming the EDA buyer ID dataset is accessible in Fabric and understanding refresh cadence of UCC filing data
 
 ---
 
 ## Summary Timeline
 
 ```
+Phase 0   DQ reporting baseline       Complete — weekly snapshot pipeline + Power BI report
 Phase 1   Path A quick wins           Low effort, start immediately
 Phase 2   EQUIP data cleanup          Run parallel to Phase 1
 Phase 3   Path B bulk upload          Main project effort, after Phase 2
@@ -269,6 +328,8 @@ Phase 4   SF Prospect merges          After Phase 1, ongoing during Phase 3
 Phase 5   Manual review backlog       Ongoing parallel track
 Phase 6   EQUIP dedup                 After Phases 1–3, high coordination cost
 Phase 7   Operations Center           Separate track, after Phases 1–4
+Phase 8   Expert Connect enrichment   After Phases 1–3, integration research required
+Phase 9   EDA / UCC lost sale alerts  After Phases 1–3, depends on EDA dataset access
 ```
 
 ---
