@@ -112,6 +112,18 @@ These Salesforce customers have an entity ID from the quote workflow but no form
 **Effort:** Medium | **Risk:** Low | **Dependency:** None (can run parallel to Phase 1)  
 **Goal:** Improve data quality so Path B uploads produce tight matches instead of potential matches.
 
+#### Step 2.0 — Validate EQUIP/JDSO Field Parity Before Cleanup
+**Prerequisite:** Run before any other step in this phase.
+
+The EQUIP ↔ JDSO integration is bidirectional: changes in EQUIP sync to JDSO, and updates made in JDSO send a full contact field payload back to EQUIP. If a record is already out of sync between the two systems and a bulk update is applied via JDSO/Dataverse (the preferred bulk update path), JDSO's version of each field will overwrite what EQUIP has — including cases where EQUIP has the correct value and JDSO is stale. Running any cleanup pass without first knowing the current mismatch state risks propagating JDSO's bad data into EQUIP rather than correcting it.
+
+**Steps:**
+- Write a query joining `Equip.contact` to `Salesforce.Account` on `contact_code` / `Anvil__AccountNumber__c` and comparing key synced fields: name (first, last, company), address (street, city, state, zip), country, phone numbers (business, private, mobile), email, prefix, and `Business_Individual` type
+- For each field, surface records where EQUIP and JDSO diverge — flag both "one side is null" and "both populated but different" as separate patterns
+- Identify the direction of divergence for the most common mismatch patterns (EQUIP ahead of JDSO, JDSO ahead of EQUIP, or both wrong) to inform which system to treat as authoritative per field
+- Save baseline mismatch counts before any cleanup runs; re-run after each cleanup pass to confirm the gap closes rather than widens
+- **Gate:** do not proceed with Steps 2.1–2.8 until the parity baseline is captured; use findings to decide whether to apply each cleanup pass directly in EQUIP or via JDSO/Dataverse
+
 #### Step 2.1 — Inactivate Stale Accounts
 - Use the EQUIP Inactivate Customer Records program
 - Filter: no activity since a defined cutoff date (e.g., 5 years)
@@ -311,9 +323,138 @@ Deere has provided an EDA buyer ID to entity ID mapping. UCC (Uniform Commercial
 
 - With sufficient Registry linkage coverage, we can join: EQUIP account → Registry entity ID → EDA buyer ID → UCC filing
 - Compare UCC filings against our own sales history to identify equipment purchases made elsewhere
-- Surface these as alerts to the Regional Customer Account Manager (RCAM) responsible for that account — a real-time lost sale report
-- Prioritize by account value (sales decile from DQ report) to focus RCAM attention on high-value accounts first
+- Surface these as alerts to the Regional Customer Account Manager (CAM) responsible for that account — a real-time lost sale report
+- Prioritize by account value (sales decile from DQ report) to focus CAM attention on high-value accounts first
 - Requires confirming the EDA buyer ID dataset is accessible in Fabric and understanding refresh cadence of UCC filing data
+
+---
+
+### Phase 10 — Machine Data Quality Reporting
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phase 0 methodology established  
+**Goal:** Build a machine-level equivalent of the contact DQ report — surfacing field completeness issues, duplicates, and EQUIP vs. Registry parity gaps across the unit population.
+
+Mirrors the Phase 0 approach applied to machines rather than contacts. Captures issues by individual field (PIN, machine ID, model, serial number, etc.), completeness, duplicate detection, and parity between EQUIP and Deere's Registry. Output is a weekly snapshot and per-unit issue flags that can drive targeted bulk cleanup lists — same pattern as `contact_issues` for contacts.
+
+- Identify key fields and quality checks for the machine population (PIN format, model code validity, missing serial numbers, etc.)
+- Build a machine DQ snapshot notebook modeled on `notebooks/dq-snapshot.ipynb`
+- Surface duplicate units within EQUIP and parity gaps between EQUIP and Registry
+- Generate per-unit issue lists for targeted cleanup — feed into Phase 11 batch operations
+
+---
+
+### Phase 11 — Machine Cleanup
+**Effort:** TBD | **Risk:** High | **Dependency:** Phase 10 complete  
+**Goal:** Merge duplicate units, enrich machine records, correct PIN numbers and machine IDs, sync with Deere's Registry and Operations Center, and establish a centralized ongoing process for machine data maintenance.
+
+Machine cleanup is more complex than contact cleanup — units touch more systems (EQUIP, Deere Registry, Operations Center, JDParts, warranty) and corrections often require physical verification of the unit. The goal is to handle as much as possible in bulk using the DQ report as a prioritization tool, and to route the remainder through a centralized team (modeled on the warranty group workflow) so that every unit that comes through the shop is an opportunity to validate and enrich its record.
+
+- **Merge duplicate units in EQUIP** — identify and merge units entered multiple times; consolidate transaction and work order history to the surviving record
+- **Correct PIN numbers and machine IDs** — identify invalid or missing PINs using format validation; update from available sources (warranty, JDParts, physical inspection)
+- **Sync with Deere's Registry** — submit corrected machine data to Registry via available update paths; confirm ownership and unit records align with our EQUIP population
+- **Update Operations Center** — where applicable, reflect machine record corrections in Operations Center org assignments
+- **Enrich machine records** — identify additional data sources (warranty history, JDParts, manufacturer data) that can fill missing fields in bulk
+- **Define centralized maintenance process** — document a workflow for the warranty team (or equivalent) to validate and update machine data whenever a unit is brought in for service; make this a standard part of the service intake checklist
+- **Outline manual process** — for records that cannot be fixed in bulk, document the step-by-step correction process so any team member can execute it consistently
+
+---
+
+### Phase 12 — Auction and Listing-Based Machine Population Sync
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phase 10 complete  
+**Goal:** Pull data from auction history and online equipment listings to identify machines that should be transferred out of our active machine population in Deere's system.
+
+When a machine appears in auction results or active online listings under a different owner, it has likely left our customer's possession and should no longer be part of our tracked population in Deere's Registry. Identifying these proactively — rather than waiting for manual discovery — keeps our machine population accurate and prevents stale units from generating incorrect leads, warranties, or service recommendations.
+
+- Identify available data sources: auction result feeds, online listing aggregators (e.g., MachineFinder, IronPlanet, Purple Wave), or Deere-provided transfer data
+- Match auction/listing records to our EQUIP machine population by PIN or serial number
+- Flag matched units for review: confirm the transfer and initiate the appropriate Registry population update
+- Define the transfer workflow and determine who owns the process (CAM, warranty team, or dedicated data role)
+
+---
+
+### Phase 13 — CRM Enrichment
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phases 1–4 complete  
+**Goal:** Enrich Salesforce customer accounts with external and internal data to give CAMs a fuller picture of each customer — reducing the need to jump between systems and surfacing context that currently lives nowhere visible in the CRM.
+
+With Registry linkage established and the account list cleaned up, the CRM becomes a much more reliable place to layer in additional data. The focus is on information that directly helps CAMs make better decisions and have more informed customer conversations.
+
+- **Customer segmentation data** — pull or derive segmentation attributes (customer type, equipment tier, revenue band, industry) and sync to Salesforce account fields so CAMs can filter and prioritize their books
+- **UCC filing data** — surface recent UCC filings on linked accounts directly in the CRM; gives CAMs visibility into financing activity and flags accounts that may have purchased elsewhere (connects to Phase 9)
+- **Sales history** — enrich accounts with key sales metrics (lifetime revenue, last purchase date, top equipment categories) pulled from EQUIP or Fabric; eliminates the need to leave Salesforce to look up purchase history
+- **Deep links to Sales Center and Service Center** — add direct links from the Salesforce account record to the corresponding customer profile in Sales Center and Service Center; reduces context-switching for CAMs during customer calls
+- **Additional enrichment sources** — evaluate other available data (Operations Center org data, warranty history, CLG lead scores) and determine which fields provide enough consistent value to include
+
+---
+
+### Phase 14 — Opportunity Mining and Surfacing Tools
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phase 13 complete  
+**Goal:** Build tooling that proactively surfaces opportunities for CAMs — identifying which accounts to prioritize, what to discuss, and when to reach out — rather than relying on CAMs to manually mine for leads.
+
+With enriched CRM data and Registry linkage in place, the underlying data exists to drive intelligent opportunity identification. The goal is to surface the right account to the right CAM at the right time, with enough context to make the outreach meaningful.
+
+- **Equipment replacement opportunity scoring** — use CLG lead data, equipment age, and sales history to score accounts by likelihood of being in a buying window; surface top scores as a prioritized list in Salesforce
+- **Lost sale follow-up queue** — route UCC-flagged lost sale alerts (Phase 9) directly into a CAM action queue in Salesforce with account context attached
+- **Lapsed customer identification** — flag accounts that transacted historically but have gone quiet; surface for CAM outreach before they are lost entirely
+- **Cross-sell and upsell signal detection** — identify accounts with gaps in their equipment portfolio relative to their operation type or peer group
+- **Opportunity dashboard** — a consolidated view in Salesforce or Power BI giving each CAM their top opportunities ranked by potential value, with one-click access to the relevant account and supporting context
+
+---
+
+### Phase 15 — Marketing and Sales Automation
+**Effort:** TBD | **Risk:** Low | **Dependency:** Phase 13 complete  
+**Goal:** Use the cleaned, enriched customer dataset to drive automated outreach and lead qualification — replacing ad-hoc campaigns with systematic, data-driven touchpoints across whole goods, parts, service, PIPs, and warranty.
+
+A clean, linked, enriched customer dataset is the prerequisite for effective marketing automation. Once Phases 1–13 have established a reliable foundation, outreach can be triggered by data signals rather than manually built campaign lists. The goal is to reach the right customer at the right time with the right message — and to qualify leads automatically so CAMs spend time on opportunities rather than on list-building.
+
+- **Expiring warranty outreach** — identify customers with warranties nearing expiration and trigger automated or CAM-assisted outreach for extended warranty or service plan offers
+- **PIP (Performance Improvement Plan) notification campaigns** — surface customers with units eligible for open PIPs; automate outreach to schedule the update and drive shop traffic
+- **Parts and service campaign triggers** — use equipment age, service history, and seasonal patterns to trigger timely outreach (e.g., pre-season service reminders, filter and wear-part replenishment)
+- **Whole goods replacement campaigns** — use CLG lead scores, equipment age, and sales history to build targeted replacement campaigns for customers approaching the end of a typical equipment lifecycle
+- **Lead qualification automation** — build scoring and routing logic so inbound leads (online form submissions, CLG leads, trade-in inquiries) are automatically qualified and assigned to the right CAM with relevant account context attached
+- **Outreach sequencing** — define and automate multi-touch outreach sequences (email, phone prompt, Salesforce task) for each campaign type so follow-through doesn't depend on individual CAM memory
+
+---
+
+### Phase 16 — Documentation and Playbooks
+**Effort:** Low-Medium | **Risk:** Low | **Dependency:** Parallel track — grows as each phase ships  
+**Goal:** Build practical documentation for the tools, datasets, and processes we are creating — so anyone on the team can use them effectively without needing to know how they were built.
+
+Documentation is written as each phase completes, not at the end. The audience is primarily CAMs, ASRs, and anyone doing account management or research — not the people who built the tools. The goal is short, task-oriented guides that answer "how do I do X" rather than "how does X work."
+
+- **Account cleanup guide** — step-by-step instructions for how to identify and fix issues on an account: using the DQ report to find problems, correcting data in EQUIP or Salesforce, and confirming the fix is reflected in reporting
+- **Data quality report usage guide** — how to read the Power BI report, how to pull a list of accounts affected by a specific issue, how to interpret scores, and how to use the contact-level issue flags for bulk cleanup
+- **CRM enrichment field guide** — reference document explaining each enriched field in Salesforce: what it means, where it comes from, how often it updates, and how to use it in CAM workflows
+- **Account research playbook** — a structured process for preparing for a sales call: which systems to check, what data to pull, how to interpret CLG leads, UCC filings, equipment history, and service records into a coherent picture of the account
+- **Opportunity mining guide** — how to use the opportunity dashboard and scoring tools to identify and prioritize accounts worth contacting, with worked examples by scenario (replacement cycle, lapsed customer, lost sale follow-up)
+- **Tool-specific how-to guides** — short reference docs for each tool or dataset as it ships (Expert Connect enrichment, Operations Center mapping, auction sync, etc.)
+
+---
+
+### Phase 17 — Future Ideas Backlog
+**Status:** Unscoped — candidates for future projects  
+**Goal:** Capture ideas worth exploring once Phases 1–16 are underway and priorities can be set with more context.
+
+These are not committed phases — they are ideas that logically extend from the work in earlier phases and should be revisited as the project matures. Grouped by theme for easier prioritization later.
+
+#### Proactive Data Governance
+- **Real-time linkage pipeline** — rather than batch uploads, automatically run new EQUIP contacts through the matching process at creation time so the backlog never accumulates again
+- **Automated quality maintenance** — trigger DQ flags immediately when bad data is entered (invalid phone, placeholder email, etc.) rather than catching it in the weekly snapshot; could live as EQUIP or Salesforce validation rules
+- **Data stewardship program** — define ongoing ownership of data quality: who is responsible for which fields, what standards apply, and how issues escalate; the organizational complement to the technical tooling
+
+#### Additional Data Sources
+- **JDLink / telematics** — machines with JDLink have hours, fault codes, and location data accessible via Operations Center; linking this to customer accounts proactively surfaces service needs before a customer calls
+- **Parts order history** — connect parts purchase history to the customer and machine record to surface replenishment opportunities and identify parts-only customers who might be service conversion targets
+- **Customer satisfaction data** — link JD satisfaction survey results (CSI scores) to Salesforce accounts so CAMs have visibility into satisfaction trends alongside sales and service history; a dissatisfied high-value account is a retention priority
+- **FSA / Farm Service Agency data** — Deere uses FSA/SIC data as a Registry source; if accessible, could help with contact enrichment and customer classification (farm size, crop types, operation profile)
+
+#### Advanced Analytics
+- **Predictive churn modeling** — use sales history, equipment age, service frequency, and UCC data to score customers by churn risk; surface high-value accounts trending toward a competitor before the loss happens
+- **Fleet composition and competitive intelligence** — UCC data shows all financed equipment a customer owns, not just ours; understanding a customer's full fleet (including competitive units) sharpens trade-in and replacement conversations
+- **Trade-in and inventory matching** — connect customer equipment history and replacement scoring to available used inventory so CAMs can surface a specific trade-in offer rather than a generic replacement conversation
+
+#### Organizational and Access
+- **Digital User Account (DUA) linkage** — Deere customers with a myJohnDeere account have a DUA that ties to their Registry entity; linking our accounts to DUAs gives visibility into digital engagement and unlocks additional Deere data streams
+- **Territory and book optimization** — with a clean, scored account list, build tooling to analyze CAM/ASR territory assignments by account value, geography, and workload rather than relying on static territory maps
+- **SMS / text outreach channel** — once phone numbers are validated and enriched, add SMS as a channel for campaign touchpoints and service appointment reminders; higher open rates than email for time-sensitive outreach
 
 ---
 
@@ -330,6 +471,14 @@ Phase 6   EQUIP dedup                 After Phases 1–3, high coordination cost
 Phase 7   Operations Center           Separate track, after Phases 1–4
 Phase 8   Expert Connect enrichment   After Phases 1–3, integration research required
 Phase 9   EDA / UCC lost sale alerts  After Phases 1–3, depends on EDA dataset access
+Phase 10  Machine DQ reporting        Longer term — mirrors Phase 0 for unit population
+Phase 11  Machine cleanup             After Phase 10 — dedup, enrichment, Registry sync, centralized process
+Phase 12  Auction/listing sync        After Phase 10 — transfer identification from external sources
+Phase 13  CRM enrichment              After Phases 1–4 — segmentation, UCC data, sales history, deep links
+Phase 14  Opportunity mining tools    After Phase 13 — surfacing and prioritizing opportunities for CAMs
+Phase 15  Marketing & sales automation After Phase 13 — outreach campaigns, lead qualification, automated triggers
+Phase 16  Documentation & playbooks   Parallel track — grows as each phase ships; account cleanup, tool usage, sales prep
+Phase 17  Future ideas backlog         Unscoped — candidates for future projects once Phases 1–16 are prioritized
 ```
 
 ---
