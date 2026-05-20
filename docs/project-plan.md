@@ -106,6 +106,43 @@ These Salesforce customers have an entity ID from the quote workflow but no form
 
 **Expected outcome:** ~13,500+ additional formal linkages; stale/wrong Salesforce entity IDs identified as a side effect.
 
+#### Step 1.3 — Quote-to-Sale Gap: Match Quoted Prospects to Sold-To EQUIP Accounts
+When a unit is sold, the sold-to EQUIP account is often a different Salesforce account than the prospect that was originally quoted. This step surfaces those mismatches and uses them to drive both additional Path A linkages and Phase 4 Prospect → Customer merge candidates.
+
+**Query:** Joins `Anvil__DealerStockUnit__c` to `Anvil__JDQuote__c` and both account records to find all sold units where `sold_to_account ≠ quoted_account`. Returns entity IDs and contact codes for both sides.
+
+```sql
+SELECT
+  dsu.Name AS [Stock Unit]
+, sold_to_account.Name AS [Sold To Account]
+, jdquote_account.Name AS [Quoted Account]
+, sold_to_account.Anvil__CustomerCompEntityID__c AS [Sold To Entity Id]
+, jdquote_account.Anvil__CustomerCompEntityID__c AS [Quoted Entity Id]
+, sold_to_account.Anvil__Contact_Code__c AS [Sold To Contact Code]
+, jdquote_account.Anvil__Contact_Code__c AS [Quoted Contact Code]
+, jdq.Name AS [Quote Name]
+, dsu.Anvil__SalesDate__c AS [Customer Invoice Date]
+, dsu.Id AS [Stock Unit Salesforce Id]
+, dsu.Anvil__Sold_JDQuote__c AS [Quote Salesforce Id]
+, dsu.Anvil__Account__c AS [Sold To Account Salesforce Id]
+, jdq.Anvil__Customer__c AS [Quoted Account Salesforce Id]
+FROM Salesforce.Anvil__DealerStockUnit__c dsu
+LEFT JOIN Salesforce.Account sold_to_account ON sold_to_account.Id = dsu.Anvil__Account__c
+LEFT JOIN Salesforce.Anvil__JDQuote__c jdq ON jdq.Id = dsu.Anvil__Sold_JDQuote__c
+LEFT JOIN Salesforce.Account jdquote_account ON jdquote_account.Id = jdq.Anvil__Customer__c
+WHERE sold_to_account.Id <> jdquote_account.Id AND Anvil__SalesDate__c IS NOT NULL
+ORDER BY dsu.Anvil__SalesDate__c DESC
+```
+
+**Steps:**
+1. Run the query and review the result set — establishes the total population of quote/sale account mismatches
+2. For sold-to EQUIP accounts with no entity ID: extract their contact codes, run through the Customer Linkage Tool (Path B), retrieve matched entity IDs
+3. Compare the tight-matched entity ID against the quoted prospect's `Anvil__CustomerCompEntityID__c` — where they match, the prospect and EQUIP customer are confirmed the same person
+4. Use confirmed matches as Path A linkage candidates for the sold-to EQUIP account (entity ID is now known via the tight match)
+5. Flag all mismatched pairs — regardless of entity ID agreement — as Phase 4 Prospect → Customer merge candidates; these represent sales where the SF accounts were never consolidated after the sale closed
+
+**Secondary use — duplicate cleanup:** Cases where the entity IDs match but the accounts were never merged are strong inputs for Phase 6 deduplication. The quoted prospect and the sold-to customer are the same entity entered twice and never reconciled.
+
 ---
 
 ### Phase 2 — EQUIP Data Cleanup
