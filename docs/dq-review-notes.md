@@ -96,7 +96,10 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 | `[ ]` | `prefix_in_name` | | |
 | `[ ]` | `suffix_in_surname` | | |
 | `[ ]` | `combined_names_in_name` | | |
-| `[ ]` | `familiar_name_pattern` — e.g., "Billy (Joe)" | | |
+| `[!]` | `familiar_name_pattern` — e.g., "Billy (Joe)" | Parenthetical check on `first_name` only. Three additional checks needed for the standalone `Familiar_Name` column: (1) `Familiar_Name` equals `name` — redundant entry, adds no information; (2) status/alert keywords in `Familiar_Name` — same pattern list as `status_text_in_name`; (3) non A–Z or space characters in `Familiar_Name` — catches numbers, punctuation, symbols that indicate junk data | See Action Item #25 |
+| `[ ]` | `familiar_name_same_as_first` — `Familiar_Name` equals `name` field | | |
+| `[ ]` | `status_text_in_familiar_name` — alert keywords in `Familiar_Name` | | |
+| `[ ]` | `familiar_name_invalid_chars` — non A–Z or space chars in `Familiar_Name` | | |
 
 ### 4d Email
 
@@ -212,6 +215,8 @@ Consolidated list of follow-up tasks surfaced during review. Add rows as you go.
 | 21 | Report | Build two parity-specific dimension tables for the Registry Parity section. (1) `parity_field` — maps the field prefix from `metric_name` (e.g., `business_phone`) to a clean display name (e.g., "Business Phone"), description (scope and source fields), and sort order. (2) `parity_outcome` — maps the outcome suffix (e.g., `equip_only`) to a clean label (e.g., "EQUIP Only"), description, and sort order. These allow the parity matrix visual to use readable axis labels and slice by field or outcome independently. Values defined in the Dimension Tables Reference section below. | Medium | `[x]` |
 | 22 | Staleness | Exclude vendor-only contacts from the `no_account` staleness bucket. Contacts linked to an AP master record but with no AR master (`ArMaster_Customer`) are not expected to have an AR account and should not appear in `no_account` — they are not customers. Identify the EQUIP table that tracks AP/vendor relationships, then add a LEFT JOIN + `IS NULL` exclusion in `contact_enriched` (or in the staleness tier assignment) to filter them out before the staleness bucket is assigned. | Medium | `[x]` |
 | 23 | JDSO Parity / All Categories | Filter internal/house accounts from parity queries and evaluate scope for the DQ snapshot. Accounts used for internal purposes (cash, warranty, e-commerce, internal charges, etc.) are generic and not tied to an individual customer or business contact — including them inflates counts and muddies mismatch analysis. Identify the field(s) in EQUIP that distinguish internal accounts (e.g., `TRADE_TYPE`, `ACC_TYPE`, or a naming convention on `contact_code` / `company_name`), then add the exclusion filter to `dq-jdso-parity.sql` Sections 0–2 and evaluate whether the same filter should apply to the DQ snapshot's `active_contacts` CTE. | Medium | `[ ]` |
+| 26 | All Checks | Add postal address fields to all relevant checks — completeness (missing_*), placeholder, format (state_not_2char, country_not_2char, zip_not_5digits), and status_text_in_street. Field names TBD. | Medium | `[ ]` |
+| 25 | Field Quality | Add three new `Familiar_Name` column checks to the DQ snapshot: (1) `familiar_name_same_as_first` — `Familiar_Name` IS NOT NULL AND `Familiar_Name` = `name`; denominator = I/C contacts with a non-null `Familiar_Name`. (2) `status_text_in_familiar_name` — `Familiar_Name` contains DECEASED, OUT OF BUSINESS, DO NOT USE, INACTIVE, CLOSED, FARM PLAN; same pattern list as `status_text_in_name`; denominator = I/C contacts with non-null `Familiar_Name`. (3) `familiar_name_invalid_chars` — `Familiar_Name` contains any character outside A–Z, a–z, and space (use `LIKE '%[^A-Za-z ]%'` in T-SQL); denominator = non-null `Familiar_Name`. Also verify that the existing `status_text_in_name` check's scope comment documents whether or not it already covers `Familiar_Name` — if it does, metric (2) is redundant. | Medium | `[ ]` |
 | 24 | JDSO Parity / Data Model | Investigate whether a contact code can legitimately appear in both `ArMaster` and `APMASTER`. JDSO prefixes contacts with `ARCONTACT-` or `APCONTACT-`, implying mutual exclusivity — a contact syncs as either a customer (AR) or a vendor (AP), not both. Write a query to find contact codes present in both tables and determine the count. If overlaps exist, decide whether they represent data entry errors, legitimate dual-role contacts, or a structural issue, and document the policy. The result affects how the `ar_ap_contacts` CTE in `dq-jdso-parity.sql` should handle overlapping records (currently uses `UNION` which deduplicates — confirm this is correct). | Medium | `[ ]` |
 
 ---
@@ -309,6 +314,9 @@ Parity metrics are split into one row per outcome. Each `metric_name` follows th
 | `suffix_in_surname` | Suffix in Last Name | I/C last name ends with a generation or credential suffix | e.g., JR, SR, II, MD, PHD; data belongs in `Generation` or `Suffix` field |
 | `combined_names_in_name` | Combined Names in First Name | I/C first name contains "&", "AND", "/", or "OR" | Likely two people in one record; should be separate contacts |
 | `familiar_name_pattern` | Familiar Name in Parentheses | I/C first name contains a parenthetical, e.g., "Billy (Joe)" | Common data entry pattern; not structurally invalid but worth reviewing |
+| `familiar_name_same_as_first` | Familiar Name Duplicates First Name | I/C contacts where `Familiar_Name` is non-null and equals `name` | Adds no information; denominator = I/C contacts with non-null `Familiar_Name` |
+| `status_text_in_familiar_name` | Status Text in Familiar Name | `Familiar_Name` contains alert/status keywords | Same pattern list as `status_text_in_name`; denominator = non-null `Familiar_Name` |
+| `familiar_name_invalid_chars` | Invalid Characters in Familiar Name | `Familiar_Name` contains characters outside A–Z and space | Catches digits, punctuation, symbols; `LIKE '%[^A-Za-z ]%'` in T-SQL; denominator = non-null `Familiar_Name` |
 
 #### Email
 
