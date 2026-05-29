@@ -15,9 +15,9 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 | `[!]` | `linked_count` — % linked by type (B/I/C) | Informational only — not an issue metric; including it in issue rate numerator muddies the calculation. Denominator is higher than completeness metrics — ~2 extra contacts unaccounted for | Investigate why `contact_linkage` denominator exceeds `contact_enriched` count; likely a fan-out from the LEFT JOIN to `customer_cross_ref` producing duplicate rows for contacts with multiple cross-ref entries |
 | `[!]` | `unlinked_count` — unlinked by type | Values look correct relative to linked count; this one IS an issue metric. Shares the same inflated denominator issue. | Same investigation as `linked_count` |
 | `[x]` | `ckc_id_no_cross_ref` — has Ckc_Id but no cross_ref | Looks correct | |
-| `[x]` | `type_mismatch_linkage` — C at entity level / B·I at contact level | Logic was inverted — was flagging correct linkages as mismatches. Corrected: C with `contact_id = 0 / NULL` is now a mismatch; B/I with `contact_id != 0` is now a mismatch. Awaiting re-run to verify actual rate. | See Action Item #14 — verify denominator consistency across linkage metrics |
+| `[!]` | `type_mismatch_linkage` — C at entity level / B·I at contact level | Logic was inverted — was flagging correct linkages as mismatches. Corrected: C with `contact_id = 0 / NULL` is now a mismatch; B/I with `contact_id != 0` is now a mismatch. Awaiting re-run to verify actual rate. **Update (2026-05-29, Vicky/JD):** C-at-entity-level linkages are acceptable per JD — many-to-one is fine and contacts like AP can link directly to the business entity. The real concern is I-type contacts linked to a business entity. Metric scope may need revision. | See Action Item #14; revisit metric definition — consider narrowing to I-to-business mismatches only per Vicky's guidance |
 | `[ ]` | `duplicate_entity_id` — entity IDs with 2+ linked contacts | | |
-| `[!]` | `orphan_cross_ref` — cross_ref entries with no active EQUIP contact | Count inflated — query is not filtering to Hutson linkages only | Add `cross_ref_description = 'HUTSON INC Dealer XREF'` filter to both the numerator and denominator; exclude EDA and other cross-ref types |
+| `[!]` | `orphan_cross_ref` — cross_ref entries with no active EQUIP contact | Count inflated — query is not filtering to Hutson linkages only. Also contains linkages to employee records (technicians/salespersons) — scope decision needed. | Add `cross_ref_description = 'HUTSON INC Dealer XREF'` filter to both numerator and denominator; exclude EDA and other cross-ref types. See Action Item #27 for employee scope decision. |
 
 **Notes:**
 
@@ -186,6 +186,24 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 
 ---
 
+## Stakeholder Notes
+
+### 2026-05-29 — Vicky (John Deere, Customer Search / Linkage / Registry)
+
+Call to discuss the DQ report and open questions about dataset relationships.
+
+- **Business contact → business entity linkages (C-at-entity-level):** JD has no preference — many-to-one is acceptable. Contacts like AP can link directly to the business entity. Type mismatches are not a blocker as long as the link points to the correct business. The real concern is individual-to-business mismatches. See action on `type_mismatch_linkage` metric above.
+- **Ops Center org ID linkages:** Entity ID → Ops Center org ID is a **many-to-many** relationship. Nevin Kroeker (DDL PM) is working on a mapping table but is blocked on permissions with the Ops Center team. Alternative path: pull Ops Center data ourselves to measure current coverage if JD cannot share the full dataset.
+- **Employee linkages:** No standard across dealers — some link salesperson/technician records directly to the Registry, others create separate contacts. Up to Hutson to decide. See Action Item #27.
+- **Deactivating accounts:** Up to Hutson. Vicky's guidance: prioritize recent purchasers and active accounts — focus linkage coverage there rather than chasing deactivated records. See Action Item #28.
+
+**Open follow-ups from call:**
+- Bump Nevin Kroeker on org linkage mapping table status (Action Item #29)
+- Decide Hutson's approach on employee linkages (Action Item #27)
+- Decide Hutson's approach on account deactivation (Action Item #28)
+
+---
+
 ## Open Action Items
 
 Consolidated list of follow-up tasks surfaced during review. Add rows as you go.
@@ -217,6 +235,9 @@ Consolidated list of follow-up tasks surfaced during review. Add rows as you go.
 | 23 | JDSO Parity / All Categories | Filter internal/house accounts from parity queries and evaluate scope for the DQ snapshot. Accounts used for internal purposes (cash, warranty, e-commerce, internal charges, etc.) are generic and not tied to an individual customer or business contact — including them inflates counts and muddies mismatch analysis. Identify the field(s) in EQUIP that distinguish internal accounts (e.g., `TRADE_TYPE`, `ACC_TYPE`, or a naming convention on `contact_code` / `company_name`), then add the exclusion filter to `dq-jdso-parity.sql` Sections 0–2 and evaluate whether the same filter should apply to the DQ snapshot's `active_contacts` CTE. | Medium | `[ ]` |
 | 26 | All Checks | Add postal address fields to all relevant checks — completeness (missing_*), placeholder, format (state_not_2char, country_not_2char, zip_not_5digits), and status_text_in_street. Field names TBD. | Medium | `[ ]` |
 | 25 | Field Quality | Add three new `Familiar_Name` column checks to the DQ snapshot: (1) `familiar_name_same_as_first` — `Familiar_Name` IS NOT NULL AND `Familiar_Name` = `name`; denominator = I/C contacts with a non-null `Familiar_Name`. (2) `status_text_in_familiar_name` — `Familiar_Name` contains DECEASED, OUT OF BUSINESS, DO NOT USE, INACTIVE, CLOSED, FARM PLAN; same pattern list as `status_text_in_name`; denominator = I/C contacts with non-null `Familiar_Name`. (3) `familiar_name_invalid_chars` — `Familiar_Name` contains any character outside A–Z, a–z, and space (use `LIKE '%[^A-Za-z ]%'` in T-SQL); denominator = non-null `Familiar_Name`. Also verify that the existing `status_text_in_name` check's scope comment documents whether or not it already covers `Familiar_Name` — if it does, metric (2) is redundant. | Medium | `[ ]` |
+| 27 | Linkage Quality / Project Decision | Decide Hutson's approach on employee linkages. Confirmed (2026-05-29, Vicky/JD) that no dealer standard exists — some dealers link salesperson/technician records directly to the Registry using their existing contact code, others create separate contacts for them. Options for Hutson: **(A) Filter employees out** of all linkage metrics and the project scope — add `WKMECHFL` / `VhSalman` exclusions to `orphan_cross_ref` and treat employees as out of scope; **(B) Link employees via existing contact code** — keep them in scope and formally link technician/salesperson contacts to the Registry; **(C) Create separate contacts** for employees and link those. Option A is likely correct given project goals, but needs an explicit decision. | Medium | `[ ]` |
+| 28 | Project Decision | Decide Hutson's approach on account deactivation. Vicky's guidance (2026-05-29): prioritize recent purchasers and active accounts — do not chase deactivated records. Hutson needs to define: (1) what constitutes an "active" account for linkage purposes (last transaction date threshold, AR account status, or other signal), and (2) whether deactivated contacts should be excluded from upload batches going forward or retroactively cleaned up. | Medium | `[ ]` |
+| 29 | Project Planning | Ops Center org ID linkage — research and relationship mapping. Entity ID → Ops Center org ID is a many-to-many relationship per Vicky (2026-05-29). Nevin Kroeker (DDL PM at JD) is building a mapping table but is blocked on permissions with the Ops Center team. Two paths: (1) contact Nevin for status and wait for the mapping table, or (2) pull Ops Center data directly to measure current entity-to-org coverage ourselves. Next step: reach out to Nevin to get a status update before deciding which path to take. | Low | `[ ]` |
 | 24 | JDSO Parity / Data Model | Investigate whether a contact code can legitimately appear in both `ArMaster` and `APMASTER`. JDSO prefixes contacts with `ARCONTACT-` or `APCONTACT-`, implying mutual exclusivity — a contact syncs as either a customer (AR) or a vendor (AP), not both. Write a query to find contact codes present in both tables and determine the count. If overlaps exist, decide whether they represent data entry errors, legitimate dual-role contacts, or a structural issue, and document the policy. The result affects how the `ar_ap_contacts` CTE in `dq-jdso-parity.sql` should handle overlapping records (currently uses `UNION` which deduplicates — confirm this is correct). | Medium | `[ ]` |
 
 ---
@@ -238,9 +259,9 @@ Columns: **metric_name** (snapshot value) · **Label** (clean Power BI display n
 | `linked_count` | Linked Contacts | Count of active contacts with a matching `customer_cross_ref` entry | Sentinel entity ID 999999998 excluded |
 | `unlinked_count` | Unlinked Contacts | Count of active contacts with no `cross_ref` match | Complement of `linked_count`; denominator = all active contacts |
 | `ckc_id_no_cross_ref` | Ckc_Id Without Cross-Ref | Contacts that have a `Ckc_Id` value in EQUIP but no matching Registry linkage | Residual from Phase 1.1; denominator = contacts where `Ckc_Id IS NOT NULL` |
-| `type_mismatch_linkage` | Linkage Type Mismatch | Linked contacts where the linkage level (entity vs. contact) doesn't match the contact type (B/I vs. C) | C should have non-zero `contact_id` (linked as business contact); B/I should have `contact_id = 0` or null (entity-only linkage). Logic was previously inverted and has been corrected. |
+| `type_mismatch_linkage` | Linkage Type Mismatch | Linked contacts where the linkage level (entity vs. contact) doesn't match the contact type (B/I vs. C) | C should have non-zero `contact_id` (linked as business contact); B/I should have `contact_id = 0` or null (entity-only linkage). Logic was previously inverted and has been corrected. **Per Vicky (2026-05-29):** C-at-entity-level is acceptable; real concern is I-type linked to a business entity. Metric scope may need to be narrowed to I-to-business mismatches only. |
 | `duplicate_entity_id` | Duplicate Entity IDs | Entity IDs in the Registry that are linked to 2+ distinct EQUIP contacts | Phase 6 cleanup targets; denominator = distinct entity IDs among linked contacts |
-| `orphan_cross_ref` | Orphan Cross-Ref Entries | `cross_ref` entries whose `cross_ref_number` has no matching active EQUIP contact | Must filter to `cross_ref_description = 'HUTSON INC Dealer XREF'` only — current query includes all cross-ref types and inflates the count |
+| `orphan_cross_ref` | Orphan Cross-Ref Entries | `cross_ref` entries whose `cross_ref_number` has no matching active EQUIP contact | Must filter to `cross_ref_description = 'HUTSON INC Dealer XREF'` only — current query includes all cross-ref types and inflates the count. Also needs employee exclusion (`WKMECHFL` / `VhSalman`) — cross_ref currently includes technician/salesperson contacts; pending scope decision (Action Item #27) |
 
 ---
 

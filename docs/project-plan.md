@@ -134,14 +134,39 @@ WHERE sold_to_account.Id <> jdquote_account.Id AND Anvil__SalesDate__c IS NOT NU
 ORDER BY dsu.Anvil__SalesDate__c DESC
 ```
 
+**Query:** `queries/phase-1/block-7e.sql` — filters to sold-to accounts with no entity ID where the quoted prospect has one; outputs in `DBS_Registry_UploadTemplate.csv` column order for direct Path B upload. Adjust the `Anvil__SalesDate__c >=` date filter for each run period.
+
 **Steps:**
-1. Run the query and review the result set — establishes the total population of quote/sale account mismatches
+1. Run `block-7e.sql` scoped to the desired date range and review the result set — establishes the population of quote/sale account mismatches for that period
 2. For sold-to EQUIP accounts with no entity ID: extract their contact codes, run through the Customer Linkage Tool (Path B), retrieve matched entity IDs
 3. Compare the tight-matched entity ID against the quoted prospect's `Anvil__CustomerCompEntityID__c` — where they match, the prospect and EQUIP customer are confirmed the same person
 4. Use confirmed matches as Path A linkage candidates for the sold-to EQUIP account (entity ID is now known via the tight match)
 5. Flag all mismatched pairs — regardless of entity ID agreement — as Phase 4 Prospect → Customer merge candidates; these represent sales where the SF accounts were never consolidated after the sale closed
 
 **Secondary use — duplicate cleanup:** Cases where the entity IDs match but the accounts were never merged are strong inputs for Phase 6 deduplication. The quoted prospect and the sold-to customer are the same entity entered twice and never reconciled.
+
+#### Step 1.4 — Serial Number Lookup: Link Unlinked Accounts via Equipment Ownership in Deere's Registry
+Units we have sold carry serial numbers in our sales data. Deere's Registry associates equipment to a registered owner (entity ID). If we can join our serial numbers to the Registry's equipment ownership records and retrieve the entity ID of the registered owner, any EQUIP account with no current entity ID that matches becomes a Path A linkage candidate — no matching algorithm required.
+
+**Primary use case — create linkages:** For sold-to EQUIP accounts with no entity ID, look up the serial number of equipment we sold them in Deere's Registry. If the registered owner's entity ID matches nothing we already have, it is a new linkage candidate. Compare against our EQUIP `Ckc_Id` and Salesforce `Anvil__CustomerCompEntityID__c` to confirm before uploading.
+
+**Secondary use cases (document findings, defer action):**
+- **Prospect validation** — compare Registry owner entity ID against the quoted prospect's Salesforce entity ID; agreement confirms we quoted the right account; disagreement flags a potential mismatch between who we quoted and who actually owns the machine
+- **Ownership change detection** — if the Registry owner entity ID differs from the entity ID we have on file for the sold-to account, the machine may have changed hands since our sale
+- **Sold-to account accuracy** — cases where the Registry owner does not match our sold-to account at all may indicate the sale was processed to the wrong EQUIP account
+
+**Steps:**
+1. **Research the available dataset** — identify which Deere dataset in Fabric (likely under `DDP`) contains the serial number → entity ID / owner mapping and confirm the join key (PIN, serial number, or machine ID); document the table and key field in `docs/data-model.md`
+2. **Assess serial number quality** — query EQUIP's unit/machine tables to measure how many sold-to accounts have a usable serial number on record; identify gaps (blank, malformed, or placeholder PINs)
+3. **Write the lookup query** — join EQUIP serial numbers to the Registry equipment table on serial/PIN; return Registry owner entity ID alongside our EQUIP contact code and current `Ckc_Id`
+4. **Filter to linkage candidates** — narrow to rows where our account has no entity ID (`Ckc_Id IS NULL`, no cross_ref entry) and the Registry owner entity ID is populated and valid (not sentinel, not deceased/OOB)
+5. **Validate a sample** — spot-check that the Registry owner entity ID is plausible for the account before bulk uploading; check for ownership-change cases in the sample
+6. **Upload Path A linkages** — format confirmed candidates to `Create_Bulk_Linkages_Template.csv` and upload via Customer Linkage Tool → Create DBS Linkage
+
+**Open questions / prerequisites:**
+- Which Fabric table holds the serial number → entity ID mapping, and what is the join key? (Must confirm before writing the query)
+- How complete are serial numbers in our EQUIP machine population? (Drives realistic scope estimate)
+- For ownership-change cases — is the intent to link to the current Registry owner (new owner) or hold the record? Needs a decision before bulk accepting those rows
 
 ---
 
@@ -179,6 +204,7 @@ The EQUIP ↔ JDSO integration is bidirectional: changes in EQUIP sync to JDSO, 
   - Combined names ("John & Mary") in First Name — these should be separate individual records
   - "C/O Bill" or similar in address fields
   - Data that belongs in Doing Business As, Familiar Name, Generation, or Suffix fields
+  - **"Accounts Payable" as company name** — AR contacts where the invoice billing name is "Accounts Payable" (or a variant) rather than the actual business name; these will never match in the Registry and need to be identified and handled separately before any Path B upload (see Open Questions)
 - Correct in EQUIP or flag for batch update
 
 #### Step 2.4 — Business vs. Contact Linkage Decision
@@ -243,6 +269,9 @@ Prioritize batches by value to maximize early impact:
 - **Tight Match tab:** Run reconciliation script to compare Deere's matched entity IDs against our Salesforce data and apply internal validation checks before accepting — do not accept all without review
 - **Review tab (Potential Matches):** Skip for now — defer to Phase 5
 
+**Template query:** `queries/phase-1/block-7a.sql` — used for the Phase 1.2 run; contains the correct B/I/C name-field logic, `DBS_Registry_UploadTemplate.csv` column order, country code pattern, and employee exclusions. Adapt the `WHERE` clause for each new population batch.  
+**Reconciliation script:** `scripts/reconcile_tight_matches.py` — compares the tight match Excel output against Salesforce `Anvil__CustomerCompEntityID__c` and produces an AGREE/DISAGREE/SF_MISSING CSV. Run before accepting any tight match batch.
+
 #### Step 3.4 — Measure and Adjust
 After each batch:
 - Note tight match rate, error rate, and potential match rate
@@ -297,6 +326,26 @@ Online sales leads create a Request in Salesforce and a linked Prospect account.
 - Route in small batches to account managers as part of their regular customer touchpoints
 - "Do you recognize this customer? Is this the same person?" framed as a quick confirmation
 - Accept lower final linkage percentage on potential matches and revisit as bandwidth allows
+
+#### Step 5.3 — CAM / Store-Targeted Linkage Review Batches
+Rather than centralizing all manual review, generate targeted lists scoped to a single account manager's book or a single store location and let that person drive the linkages for their own customers. They know the accounts; the review burden per person is small; and the work happens in parallel across locations.
+
+**Approach:**
+- Pull unlinked EQUIP accounts filtered by branch or assigned CAM
+- Run each batch through the Customer Linkage Tool (Path B) to get tight matches, potential matches, and no-match results
+- Send tight match results directly to the responsible CAM or store team with a simple review task: confirm the match looks right, then accept the linkage in the tool
+- Route potential matches the same way — the account manager's familiarity with their customers makes these much faster to resolve than centralized review
+- Package results in a format the reviewer can work from without needing system access (Excel with customer name, Registry match details, accept/reject column)
+
+**Benefits over centralized review:**
+- No single bottleneck — each location works independently
+- CAMs can catch wrong matches that a central reviewer would miss (they know the customer)
+- Natural prioritization — each CAM focuses on their own book, highest-value accounts first
+
+**Open questions:**
+- How should results be delivered back? (Email with Excel, a Salesforce report, a simple form?) Depends on what tools the reviewers are comfortable with
+- Is there a store/branch field on the EQUIP contact record to use for slicing, or does it need to be derived from ArMaster / assigned salesperson?
+- Should this run before or after Phase 2 data cleanup — cleaner data means higher tight match rate and fewer potential matches to review
 
 ---
 
@@ -541,6 +590,7 @@ Phase 17  Future ideas backlog         Unscoped — candidates for future projec
 - [ ] **Cleanup reporting format and audience (Step 2.8):** Is a query snapshot (TSV before/after) sufficient for internal tracking, or does reporting need to be presentable to management or staff? Answer determines whether to build a structured report or keep it as ad-hoc validation queries.
 - [ ] **Phone/email validation scope (Steps 2.5–2.6):** For phone numbers, is structural validation (pattern matching in SQL) sufficient, or do we need deliverability/carrier validation? For email, is structural regex enough, or is an external API (ZeroBounce, NeverBounce) worth the cost given its impact on tight match scoring?
 - [ ] **Registry data as correction source (Step 2.7):** For linked contacts where Registry has a cleaner/more current value than EQUIP, what is the policy for updating EQUIP? Manual review per record, DBS Data Share in bulk, or leave as-is and accept divergence? Note: JD Financial records cannot be edited directly.
+- [ ] **"Accounts Payable" company name contacts — how to handle (Step 2.3 / Phase 3):** Some AR contacts have "Accounts Payable" (or a variant) as the company name because invoices are addressed to the AP department rather than the business itself. The Registry has no record for "Accounts Payable" so these contacts will always return no match from the Customer Linkage Tool. Options: (a) query to get a count and identify the population (search `company_name` LIKE `'%accounts payable%'`); (b) manually research the actual business name and correct in EQUIP before uploading; (c) attempt to match on address alone if the business name is unavailable; (d) exclude permanently and track separately as unresolvable. Need to decide scope before Phase 3 uploads begin.
 - [ ] What is the inactivation cutoff date for stale accounts? (Step 2.1)
 - [ ] Link at business entity level or contact level for C-type contacts? (Step 2.4)
 - [ ] Who at the dealership can own the manual review for the 144 disagreements and potential match batches? (Phase 5)

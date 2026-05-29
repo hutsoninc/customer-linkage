@@ -14,42 +14,49 @@ SELECT
 
     -- Business name (blank for pure individuals)
     CASE
-        WHEN c.Business_Individual IN ('B', 'C') THEN c.company_name
+        WHEN c.Business_Individual IN ('B', 'C') THEN NULLIF(LTRIM(RTRIM(c.company_name)), '')
         ELSE NULL
     END                                             AS [Business Name],
 
-    c.Doing_Business_As                             AS [Doing Business As Name],
+    NULLIF(LTRIM(RTRIM(c.Doing_Business_As)), '')   AS [Doing Business As Name],
 
     -- Person name fields: stripped for B-type to force business entity match
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.title          END AS [Prefix],
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.name            END AS [First Name],
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.Familiar_Name   END AS [Familiar Name],
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.initial         END AS [Middle Name],
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.surname         END AS [Last Name],
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.Generation      END AS [Generation],
-    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE c.Suffix          END AS [Suffix],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.title)),        '') END AS [Prefix],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.name)),         '') END AS [First Name],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.Familiar_Name)),'') END AS [Familiar Name],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.initial)),      '') END AS [Middle Name],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.surname)),      '') END AS [Last Name],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.Generation)),   '') END AS [Generation],
+    CASE WHEN c.Business_Individual = 'B' THEN NULL ELSE NULLIF(LTRIM(RTRIM(c.Suffix)),       '') END AS [Suffix],
 
     -- Physical address
-    c.street                                        AS [Address Line 1],
-    c.street_2                                      AS [Address Line 2],
-    c.city                                          AS [City],
-    c.state                                         AS [State Code],
-    c.pcode                                         AS [Postal Code],
+    NULLIF(LTRIM(RTRIM(c.street)),   '')            AS [Address Line 1],
+    NULLIF(LTRIM(RTRIM(c.street_2)), '')            AS [Address Line 2],
+    NULLIF(LTRIM(RTRIM(c.city)),     '')            AS [City],
+    NULLIF(LTRIM(RTRIM(c.state)),    '')            AS [State Code],
+    NULLIF(LTRIM(RTRIM(c.pcode)),    '')            AS [Postal Code],
     ISNULL(NULLIF(LTRIM(RTRIM(c.country)), ''), 'US') AS [Country Code],
 
     -- Contact info (used for potential match scoring)
-    c.email_address                                 AS [Email Address],
-    c.BusinessPhone                                 AS [Work Phone],
-    c.PrivatePhone                                  AS [Home Phone],
-    c.MobilePhone                                   AS [Mobile Phone],
+    NULLIF(LTRIM(RTRIM(c.email_address)), '')       AS [Email Address],
+    NULLIF(LTRIM(RTRIM(c.BusinessPhone)), '')       AS [Work Phone],
+    NULLIF(LTRIM(RTRIM(c.PrivatePhone)),  '')       AS [Home Phone],
+    NULLIF(LTRIM(RTRIM(c.MobilePhone)),   '')       AS [Mobile Phone],
 
     -- Fax: route to home or work depending on contact type
-    CASE WHEN c.Business_Individual = 'I' THEN c.fax_no ELSE NULL END AS [Home Fax],
-    CASE WHEN c.Business_Individual IN ('B','C') THEN c.fax_no ELSE NULL END AS [Work Fax],
+    CASE WHEN c.Business_Individual = 'I'        THEN NULLIF(LTRIM(RTRIM(c.fax_no)), '') ELSE NULL END AS [Home Fax],
+    CASE WHEN c.Business_Individual IN ('B','C') THEN NULLIF(LTRIM(RTRIM(c.fax_no)), '') ELSE NULL END AS [Work Fax],
 
     -- Tax: suppressed for US records
     NULL                                            AS [Tax Type],
-    NULL                                            AS [Tax ID used only in countryCode: AR AU BO BR BZ CL CO CR DO EC GF GT GY HN HT JM MX NI NZ PA PE PR PY SR SV TT UY VE]
+    NULL                                            AS [Tax ID]
+
+    -- Additional columns for cross checking results
+    -- Exclude from tight match import
+    -- , c.Business_Individual AS [Contact Type]
+    -- , c.Ckc_Id AS [Equip Contact Entity ID]
+    -- , ISNULL(c.Cmp_Ckc_Id, 0) AS [Equip Company Entity ID]
+    -- , sf.Anvil__CustomerCompEntityID__c AS [Salesforce Contact Entity ID]
 
 FROM Salesforce.Account sf
 JOIN Equip.ArMaster ar
