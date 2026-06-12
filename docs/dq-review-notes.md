@@ -91,6 +91,7 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 | `[ ]` | `status_text_in_company` | | |
 | `[ ]` | `status_text_in_street` | | |
 | `[ ]` | `dba_in_company_name` | | |
+| `[ ]` | `attn_in_company_name` — "ATTN" or "ATTENTION" in `company_name` or other fields | | |
 | `[ ]` | `test_record` | | |
 | `[ ]` | `contact_type_field_mismatch` — B has name but no company, or I/C has company but no name | | |
 | `[ ]` | `prefix_in_name` | | |
@@ -100,6 +101,7 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 | `[ ]` | `familiar_name_same_as_first` — `Familiar_Name` equals `name` field | | |
 | `[ ]` | `status_text_in_familiar_name` — alert keywords in `Familiar_Name` | | |
 | `[ ]` | `familiar_name_invalid_chars` — non A–Z or space chars in `Familiar_Name` | | |
+| `[ ]` | `familiar_name_call_pattern` — `Familiar_Name` starts with "CALL " followed by a name | | |
 
 ### 4d Email
 
@@ -140,6 +142,12 @@ Status key: `[ ]` not reviewed · `[x]` reviewed, no action · `[!]` reviewed, a
 | `[!]` | `title_unrecognized` | Not yet reviewed | Confirm denominator is scoped to non-null title only; run distinct values query to identify unrecognized titles and determine which should be added to the valid list |
 | `[!]` | `generation_unrecognized` | Not yet reviewed | Same as suffix — confirm denominator scope and review distinct unrecognized values before deciding on list additions |
 | `[!]` | `suffix_unrecognized` | 71/73 unrecognized — only 73 contacts have a suffix value at all | (1) Confirm denominator is scoped to non-null Suffix only; (2) Run `SELECT DISTINCT Suffix, COUNT(*) FROM Equip.contact WHERE Suffix IS NOT NULL GROUP BY Suffix ORDER BY COUNT(*) DESC` to review the 71 unrecognized values and determine which should be added to the valid list |
+
+### 4i Notes / Freetext
+
+| Status | Metric | Finding | Follow-up |
+|---|---|---|---|
+| `[ ]` | `card_number_in_notes` — card or account number pattern in notes/comments fields | | |
 
 ### 4h Contact Code Integrity
 
@@ -234,10 +242,12 @@ Consolidated list of follow-up tasks surfaced during review. Add rows as you go.
 | 22 | Staleness | Exclude vendor-only contacts from the `no_account` staleness bucket. Contacts linked to an AP master record but with no AR master (`ArMaster_Customer`) are not expected to have an AR account and should not appear in `no_account` — they are not customers. Identify the EQUIP table that tracks AP/vendor relationships, then add a LEFT JOIN + `IS NULL` exclusion in `contact_enriched` (or in the staleness tier assignment) to filter them out before the staleness bucket is assigned. | Medium | `[x]` |
 | 23 | JDSO Parity / All Categories | Filter internal/house accounts from parity queries and evaluate scope for the DQ snapshot. Accounts used for internal purposes (cash, warranty, e-commerce, internal charges, etc.) are generic and not tied to an individual customer or business contact — including them inflates counts and muddies mismatch analysis. Identify the field(s) in EQUIP that distinguish internal accounts (e.g., `TRADE_TYPE`, `ACC_TYPE`, or a naming convention on `contact_code` / `company_name`), then add the exclusion filter to `dq-jdso-parity.sql` Sections 0–2 and evaluate whether the same filter should apply to the DQ snapshot's `active_contacts` CTE. | Medium | `[ ]` |
 | 26 | All Checks | Add postal address fields to all relevant checks — completeness (missing_*), placeholder, format (state_not_2char, country_not_2char, zip_not_5digits), and status_text_in_street. Field names TBD. | Medium | `[ ]` |
-| 25 | Field Quality | Add three new `Familiar_Name` column checks to the DQ snapshot: (1) `familiar_name_same_as_first` — `Familiar_Name` IS NOT NULL AND `Familiar_Name` = `name`; denominator = I/C contacts with a non-null `Familiar_Name`. (2) `status_text_in_familiar_name` — `Familiar_Name` contains DECEASED, OUT OF BUSINESS, DO NOT USE, INACTIVE, CLOSED, FARM PLAN; same pattern list as `status_text_in_name`; denominator = I/C contacts with non-null `Familiar_Name`. (3) `familiar_name_invalid_chars` — `Familiar_Name` contains any character outside A–Z, a–z, and space (use `LIKE '%[^A-Za-z ]%'` in T-SQL); denominator = non-null `Familiar_Name`. Also verify that the existing `status_text_in_name` check's scope comment documents whether or not it already covers `Familiar_Name` — if it does, metric (2) is redundant. | Medium | `[ ]` |
+| 25 | Field Quality | Add four new `Familiar_Name` column checks to the DQ snapshot: (1) `familiar_name_same_as_first` — `Familiar_Name` IS NOT NULL AND `Familiar_Name` = `name`; denominator = I/C contacts with a non-null `Familiar_Name`. (2) `status_text_in_familiar_name` — `Familiar_Name` contains DECEASED, OUT OF BUSINESS, DO NOT USE, INACTIVE, CLOSED, FARM PLAN; same pattern list as `status_text_in_name`; denominator = I/C contacts with non-null `Familiar_Name`. (3) `familiar_name_invalid_chars` — `Familiar_Name` contains any character outside A–Z, a–z, and space (use `LIKE '%[^A-Za-z ]%'` in T-SQL); denominator = non-null `Familiar_Name`. (4) `familiar_name_call_pattern` — `Familiar_Name` starts with `CALL ` (case-insensitive) followed by at least one additional character; indicates the field is being used as a callback instruction rather than a nickname; denominator = I/C contacts with non-null `Familiar_Name`. Also verify that the existing `status_text_in_name` check's scope comment documents whether or not it already covers `Familiar_Name` — if it does, metric (2) is redundant. | Medium | `[ ]` |
 | 27 | Linkage Quality / Project Decision | Decide Hutson's approach on employee linkages. Confirmed (2026-05-29, Vicky/JD) that no dealer standard exists — some dealers link salesperson/technician records directly to the Registry using their existing contact code, others create separate contacts for them. Options for Hutson: **(A) Filter employees out** of all linkage metrics and the project scope — add `WKMECHFL` / `VhSalman` exclusions to `orphan_cross_ref` and treat employees as out of scope; **(B) Link employees via existing contact code** — keep them in scope and formally link technician/salesperson contacts to the Registry; **(C) Create separate contacts** for employees and link those. Option A is likely correct given project goals, but needs an explicit decision. | Medium | `[ ]` |
 | 28 | Project Decision | Decide Hutson's approach on account deactivation. Vicky's guidance (2026-05-29): prioritize recent purchasers and active accounts — do not chase deactivated records. Hutson needs to define: (1) what constitutes an "active" account for linkage purposes (last transaction date threshold, AR account status, or other signal), and (2) whether deactivated contacts should be excluded from upload batches going forward or retroactively cleaned up. | Medium | `[ ]` |
 | 29 | Project Planning | Ops Center org ID linkage — research and relationship mapping. Entity ID → Ops Center org ID is a many-to-many relationship per Vicky (2026-05-29). Nevin Kroeker (DDL PM at JD) is building a mapping table but is blocked on permissions with the Ops Center team. Two paths: (1) contact Nevin for status and wait for the mapping table, or (2) pull Ops Center data directly to measure current entity-to-org coverage ourselves. Next step: reach out to Nevin to get a status update before deciding which path to take. | Low | `[ ]` |
+| 30 | Field Quality | Add `attn_in_company_name` check — detect `company_name` values that begin with or contain `ATTN` or `ATTENTION` (case-insensitive), indicating the field is being used as a mail-routing note rather than storing the actual business name. Evaluate whether the same pattern should also be checked in `street` and `street_2`. Denominator: B contacts with a non-null `company_name`. | Medium | `[ ]` |
+| 31 | Field Quality | Add `card_number_in_notes` check — detect potential card or account numbers in EQUIP notes/comments freetext fields using a regex pattern (e.g., 13–16 consecutive digits, or 4×4 digit groups separated by spaces or dashes). First confirm the correct EQUIP field name for notes/comments (TBD). PCI sensitivity: if real card numbers are found, treat as an immediate remediation item rather than a standard DQ metric and escalate. | High | `[ ]` |
 | 24 | JDSO Parity / Data Model | Investigate whether a contact code can legitimately appear in both `ArMaster` and `APMASTER`. JDSO prefixes contacts with `ARCONTACT-` or `APCONTACT-`, implying mutual exclusivity — a contact syncs as either a customer (AR) or a vendor (AP), not both. Write a query to find contact codes present in both tables and determine the count. If overlaps exist, decide whether they represent data entry errors, legitimate dual-role contacts, or a structural issue, and document the policy. The result affects how the `ar_ap_contacts` CTE in `dq-jdso-parity.sql` should handle overlapping records (currently uses `UNION` which deduplicates — confirm this is correct). | Medium | `[ ]` |
 
 ---
@@ -329,6 +339,7 @@ Parity metrics are split into one row per outcome. Each `metric_name` follows th
 | `status_text_in_company` | Status Text in Company Name | B company name contains alert/status keywords | Adds `OOB` (standalone) to the pattern list |
 | `status_text_in_street` | Status Text in Street | Street field contains alert/status keywords | Subset of patterns — OOB and FARM PLAN excluded |
 | `dba_in_company_name` | DBA Pattern in Company Name | B company name contains "DBA", "D/B/A", or "DOING BUSINESS AS" | Data belongs in the `Doing_Business_As` field |
+| `attn_in_company_name` | ATTN Pattern in Company Name | B company name contains "ATTN" or "ATTENTION" | Field is being used as a mail-routing note; data belongs in an address line field |
 | `test_record` | Test / Dummy Record | Name or company matches known test-record values | e.g., TEST, TESTING, TEMP, DUMMY, SAMPLE |
 | `contact_type_field_mismatch` | Contact Type Field Mismatch | B has name but no company, or I/C has company but no name | Likely miscoded `Business_Individual` value |
 | `prefix_in_name` | Prefix in First Name | I/C first name starts with a title prefix (Mr., Mrs., Dr., etc.) | Data belongs in the `title` field |
@@ -338,6 +349,13 @@ Parity metrics are split into one row per outcome. Each `metric_name` follows th
 | `familiar_name_same_as_first` | Familiar Name Duplicates First Name | I/C contacts where `Familiar_Name` is non-null and equals `name` | Adds no information; denominator = I/C contacts with non-null `Familiar_Name` |
 | `status_text_in_familiar_name` | Status Text in Familiar Name | `Familiar_Name` contains alert/status keywords | Same pattern list as `status_text_in_name`; denominator = non-null `Familiar_Name` |
 | `familiar_name_invalid_chars` | Invalid Characters in Familiar Name | `Familiar_Name` contains characters outside A–Z and space | Catches digits, punctuation, symbols; `LIKE '%[^A-Za-z ]%'` in T-SQL; denominator = non-null `Familiar_Name` |
+| `familiar_name_call_pattern` | Call Instruction in Familiar Name | `Familiar_Name` starts with "CALL " followed by at least one character | Field is being used to record a callback instruction (e.g., "Call Susan") rather than a nickname; denominator = I/C contacts with non-null `Familiar_Name` |
+
+#### Notes / Freetext
+
+| metric_name | Label | Definition | Logic Notes |
+|---|---|---|---|
+| `card_number_in_notes` | Card Number in Notes | Notes/comments field contains a pattern matching a card or account number | Pattern: 13–16 consecutive digits or 4×4 groups separated by spaces/dashes; PCI sensitivity — escalate if positive results found rather than treating as routine DQ; field name TBD |
 
 #### Email
 

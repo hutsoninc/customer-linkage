@@ -15,11 +15,6 @@
      Section 0: Overall contact counts (sync coverage)
      Section 1: Summary — mismatch counts by field
      Section 2: Detail  — per-contact, per-field mismatches
-
-   NOTE: Confirm full Dataverse table path before running.
-         Placeholder below assumes same lakehouse as EQUIP.
-         Replace [Bronze_Production_Lakehouse].[Dataverse].[contact]
-         if the Synapse Link lands in a different lakehouse/schema.
    ============================================================ */
 
 
@@ -168,6 +163,7 @@ active_contacts AS (
         NULLIF(LTRIM(RTRIM(c.title)),          '') AS eq_salutation,
         NULLIF(LTRIM(RTRIM(c.Suffix)),         '') AS eq_suffix,
         NULLIF(LTRIM(RTRIM(c.Generation)),     '') AS eq_generation,
+        NULLIF(LTRIM(RTRIM(c.company_name)),   '') AS eq_company_name,
         -- Contact
         NULLIF(LTRIM(RTRIM(c.email_address)),   '') AS eq_email1,
 
@@ -205,13 +201,14 @@ jdso_contacts AS (
     SELECT
         REPLACE(REPLACE(UPPER(dc.jd_referenceid), 'ARCONTACT-', ''), 'APCONTACT-', '') AS contact_code,
         -- Name
-        NULLIF(LTRIM(RTRIM(dc.firstname)),    '') AS dv_firstname,
-        NULLIF(LTRIM(RTRIM(dc.middlename)),   '') AS dv_middlename,
-        NULLIF(LTRIM(RTRIM(dc.lastname)),     '') AS dv_lastname,
-        NULLIF(LTRIM(RTRIM(dc.nickname)),     '') AS dv_nickname,
-        NULLIF(LTRIM(RTRIM(dc.salutation)),   '') AS dv_salutation,
-        NULLIF(LTRIM(RTRIM(dc.suffix)),       '') AS dv_suffix,
-        NULLIF(LTRIM(RTRIM(dc.jd_generation)),'') AS dv_generation,
+        NULLIF(LTRIM(RTRIM(dc.firstname)),     '') AS dv_firstname,
+        NULLIF(LTRIM(RTRIM(dc.middlename)),    '') AS dv_middlename,
+        NULLIF(LTRIM(RTRIM(dc.lastname)),      '') AS dv_lastname,
+        NULLIF(LTRIM(RTRIM(dc.nickname)),      '') AS dv_nickname,
+        NULLIF(LTRIM(RTRIM(dc.salutation)),    '') AS dv_salutation,
+        NULLIF(LTRIM(RTRIM(dc.suffix)),        '') AS dv_suffix,
+        NULLIF(LTRIM(RTRIM(dc.jd_generation)), '') AS dv_generation,
+        NULLIF(LTRIM(RTRIM(dc.company)),       '') AS dv_company_name,
         -- Contact
         NULLIF(LTRIM(RTRIM(dc.emailaddress1)), '') AS dv_email1,
 
@@ -264,6 +261,7 @@ joined AS (
         e.eq_salutation,    d.dv_salutation,
         e.eq_suffix,        d.dv_suffix,
         e.eq_generation,    d.dv_generation,
+        e.eq_company_name,  d.dv_company_name,
         e.eq_email1,        d.dv_email1,
 
         e.eq_phone1,        d.dv_phone1,
@@ -298,6 +296,7 @@ field_comparisons AS (
     SELECT 'salutation',                 equip_only, eq_salutation,              dv_salutation             FROM joined UNION ALL
     SELECT 'suffix',                     equip_only, eq_suffix,                  dv_suffix                 FROM joined UNION ALL
     SELECT 'generation',                 equip_only, eq_generation,              dv_generation             FROM joined UNION ALL
+    SELECT 'company_name',               equip_only, eq_company_name,            dv_company_name           FROM joined UNION ALL
     SELECT 'email1',                     equip_only, eq_email1,                  dv_email1                 FROM joined UNION ALL
 
     SELECT 'phone1',                     equip_only, eq_phone1,                  dv_phone1                 FROM joined UNION ALL
@@ -369,6 +368,7 @@ active_contacts AS (
     SELECT
         c.contact_code,
         c.Business_Individual,
+        -- Name
         NULLIF(LTRIM(RTRIM(c.[name])),         '') AS eq_firstname,
         NULLIF(LTRIM(RTRIM(c.initial)),        '') AS eq_middlename,
         NULLIF(LTRIM(RTRIM(c.surname)),        '') AS eq_lastname,
@@ -376,6 +376,8 @@ active_contacts AS (
         NULLIF(LTRIM(RTRIM(c.title)),          '') AS eq_salutation,
         NULLIF(LTRIM(RTRIM(c.Suffix)),         '') AS eq_suffix,
         NULLIF(LTRIM(RTRIM(c.Generation)),     '') AS eq_generation,
+        NULLIF(LTRIM(RTRIM(c.company_name)),   '') AS eq_company_name,
+        -- Contact
         NULLIF(LTRIM(RTRIM(c.email_address)),   '') AS eq_email1,
 
         NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.BusinessPhone,'-',''),'(',''),')',''),' ',''),'.',''))), '') AS eq_phone1,
@@ -383,6 +385,7 @@ active_contacts AS (
         NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.MobilePhone,  '-',''),'(',''),')',''),' ',''),'.',''))), '') AS eq_mobile,
         NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.fax_no,       '-',''),'(',''),')',''),' ',''),'.',''))), '') AS eq_fax,
         NULLIF(LTRIM(RTRIM(CAST(c.Cmp_Ckc_Id AS NVARCHAR(50)))),    '') AS eq_cmp_ckc_id,
+        -- Address 1
         NULLIF(LTRIM(RTRIM(c.street)),   '') AS eq_addr1_line1,
         NULLIF(LTRIM(RTRIM(c.street_2)), '') AS eq_addr1_line2,
         NULLIF(LTRIM(RTRIM(c.city)),     '') AS eq_addr1_city,
@@ -390,6 +393,7 @@ active_contacts AS (
         NULLIF(LTRIM(RTRIM(c.pcode)),    '') AS eq_addr1_zip,
         NULLIF(LTRIM(RTRIM(c.County)),   '') AS eq_addr1_county,
         NULLIF(LTRIM(RTRIM(c.country)),  '') AS eq_addr1_country,
+        -- Address 2
         NULLIF(LTRIM(RTRIM(c.postal_street_1)), '') AS eq_addr2_line1,
         NULLIF(LTRIM(RTRIM(c.postal_street_2)), '') AS eq_addr2_line2,
         NULLIF(LTRIM(RTRIM(c.postal_city)),     '') AS eq_addr2_city,
@@ -409,13 +413,16 @@ active_contacts AS (
 jdso_contacts AS (
     SELECT
         REPLACE(REPLACE(UPPER(dc.jd_referenceid), 'ARCONTACT-', ''), 'APCONTACT-', '') AS contact_code,
-        NULLIF(LTRIM(RTRIM(dc.firstname)),    '') AS dv_firstname,
-        NULLIF(LTRIM(RTRIM(dc.middlename)),   '') AS dv_middlename,
-        NULLIF(LTRIM(RTRIM(dc.lastname)),     '') AS dv_lastname,
-        NULLIF(LTRIM(RTRIM(dc.nickname)),     '') AS dv_nickname,
-        NULLIF(LTRIM(RTRIM(dc.salutation)),   '') AS dv_salutation,
-        NULLIF(LTRIM(RTRIM(dc.suffix)),       '') AS dv_suffix,
-        NULLIF(LTRIM(RTRIM(dc.jd_generation)),'') AS dv_generation,
+        -- Name
+        NULLIF(LTRIM(RTRIM(dc.firstname)),     '') AS dv_firstname,
+        NULLIF(LTRIM(RTRIM(dc.middlename)),    '') AS dv_middlename,
+        NULLIF(LTRIM(RTRIM(dc.lastname)),      '') AS dv_lastname,
+        NULLIF(LTRIM(RTRIM(dc.nickname)),      '') AS dv_nickname,
+        NULLIF(LTRIM(RTRIM(dc.salutation)),    '') AS dv_salutation,
+        NULLIF(LTRIM(RTRIM(dc.suffix)),        '') AS dv_suffix,
+        NULLIF(LTRIM(RTRIM(dc.jd_generation)), '') AS dv_generation,
+        NULLIF(LTRIM(RTRIM(dc.company)),       '') AS dv_company_name,
+        -- Contact
         NULLIF(LTRIM(RTRIM(dc.emailaddress1)), '') AS dv_email1,
 
         NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(dc.telephone1, '-',''),'(',''),')',''),' ',''),'.',''))), '') AS dv_phone1,
@@ -423,6 +430,7 @@ jdso_contacts AS (
         NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(dc.mobilephone,'-',''),'(',''),')',''),' ',''),'.',''))), '') AS dv_mobile,
         NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(dc.fax,        '-',''),'(',''),')',''),' ',''),'.',''))), '') AS dv_fax,
         NULLIF(LTRIM(RTRIM(TRY_CAST(dc.jd_compckcid AS NVARCHAR(50)))), '') AS dv_cmp_ckc_id,
+        -- Address 1
         NULLIF(LTRIM(RTRIM(dc.address1_line1)),           '') AS dv_addr1_line1,
         NULLIF(LTRIM(RTRIM(dc.address1_line2)),           '') AS dv_addr1_line2,
         NULLIF(LTRIM(RTRIM(dc.address1_city)),            '') AS dv_addr1_city,
@@ -430,6 +438,7 @@ jdso_contacts AS (
         NULLIF(LTRIM(RTRIM(dc.address1_postalcode)),      '') AS dv_addr1_zip,
         NULLIF(LTRIM(RTRIM(dc.address1_county)),          '') AS dv_addr1_county,
         NULLIF(LTRIM(RTRIM(dc.address1_country)),         '') AS dv_addr1_country,
+        -- Address 2
         NULLIF(LTRIM(RTRIM(dc.address2_line1)),           '') AS dv_addr2_line1,
         NULLIF(LTRIM(RTRIM(dc.address2_line2)),           '') AS dv_addr2_line2,
         NULLIF(LTRIM(RTRIM(dc.address2_city)),            '') AS dv_addr2_city,
@@ -465,6 +474,7 @@ joined AS (
         e.eq_salutation,    d.dv_salutation,
         e.eq_suffix,        d.dv_suffix,
         e.eq_generation,    d.dv_generation,
+        e.eq_company_name,  d.dv_company_name,
         e.eq_email1,        d.dv_email1,
 
         e.eq_phone1,        d.dv_phone1,
@@ -507,6 +517,7 @@ field_pairs AS (
         ('salutation',    j.eq_salutation,    j.dv_salutation),
         ('suffix',        j.eq_suffix,        j.dv_suffix),
         ('generation',    j.eq_generation,    j.dv_generation),
+        ('company_name',  j.eq_company_name,  j.dv_company_name),
         ('email1',        j.eq_email1,        j.dv_email1),
 
         ('phone1',        j.eq_phone1,        j.dv_phone1),
