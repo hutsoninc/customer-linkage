@@ -2,19 +2,25 @@
 
 Formal linkage between EQUIP (dealer DBS) contacts and John Deere's Customer Registry (CKC). DBS number appears in CSC membership column across JD sales tools. Secondary goals: EQUIP data quality, SF Prospect merges, EQUIP deduplication.
 
+Domain glossary (key terms, systems, roles): `docs/context.md`
+
 ## Key Docs
 
 | File | Purpose |
 |---|---|
+| `docs/context.md` | Domain glossary — key terms, systems, roles, and JD programs |
+| `docs/project-plan.md` | Master phase index — status, effort estimates, links to phase detail files |
+| `docs/phases/` | Phase detail files — goals, steps, open questions per phase |
+| `docs/executive-summary.md` | Executive summary draft for leadership (Scott) |
+| `docs/update-log.md` | Chronological log of bulk data changes and linkage uploads |
 | `docs/data-model.md` | ERD, table relationships, field semantics |
-| `docs/data-quality-plan.md` | Data quality reporting plan — metrics, snapshot architecture, Power BI structure, open questions |
+| `docs/data-quality-plan.md` | Data quality reporting plan — metrics, snapshot architecture, Power BI structure |
 | `docs/dq-review-notes.md` | Metric-by-metric review notes and follow-up actions from Power BI DQ report |
 | `docs/dataset-equip-contact.md` | Equip.contact column reference + upload template mapping |
-| `docs/update-log.md` | Update log — bulk data changes and linkage uploads with dates and records affected |
-| `docs/project-plan.md` | Phase order of operations, open questions |
 | `docs/query-conventions.md` | Full SQL patterns with examples (UPPER join, country, employee exclusion, B/I/C logic) |
 | `docs/research-findings.md` | All query blocks, results, findings |
 | `docs/source-materials-summary.md` | Consolidated Deere reference documents |
+| `docs/archive/` | Originals of replaced documents |
 
 ## Directory Structure
 

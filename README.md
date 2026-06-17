@@ -1,6 +1,6 @@
 # Customer Linkage
 
-Tools and queries for formally linking EQUIP dealer contacts to John Deere's Customer Registry (IKC/CKC). A formal linkage causes the DBS number to appear in the CSC membership column across JD sales tools (JDQuote2, JDMint, Sales Center, Rewards, Warranty Portal) and enables correct entity routing in quotes and downstream data flows.
+Tools and queries for formally linking EQUIP dealer contacts to John Deere's Customer Registry (IKC/CKC). A formal linkage causes the DBS number to appear in the CSC membership column across JD sales tools (Sales Center, Rewards, Service Center) and enables correct entity routing in quotes and downstream data flows.
 
 ## Prerequisites
 

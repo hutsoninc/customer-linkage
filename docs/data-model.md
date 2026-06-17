@@ -68,7 +68,7 @@ erDiagram
         string  Id                  PK  "Salesforce record ID"
         int     Anvil__AccountNumber__c     FK  "= EQUIP_ArMaster.Acc_No (Customers only)"
         string  RecordTypeId                    "Customer or Prospect"
-        int     Anvil__CustomerCompEntityID__c  "Entity ID from quote workflow (Anvil/JDQuote2)"
+        int     Anvil__CustomerCompEntityID__c  "Entity ID from quote workflow (Anvil/Sales Center)"
         int     H_Equip_contact_Ckc_Id__c       "Entity ID synced from EQUIP (overwrites Anvil field)"
     }
 
@@ -252,7 +252,7 @@ As of 2026-05-01, John Deere added a `cross_ref_description` field to `DDP.custo
 ## Salesforce Entity ID Field Precedence
 
 ```
-Anvil__CustomerCompEntityID__c   ← set by JDQuote2/JDSC quote sync
+Anvil__CustomerCompEntityID__c   ← set by Sales Center (JDSC) quote sync
                                     (how Prospects get entity IDs without being in EQUIP)
         ↓ overwritten when populated
 H_Equip_contact_Ckc_Id__c        ← synced from EQUIP formal Registry linkage

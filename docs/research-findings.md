@@ -7,7 +7,7 @@
 
 ## Project Context
 
-We are linking EQUIP (dealer DBS) customer contacts to John Deere's Customer Registry (IKC/CKC). A formal linkage creates a pointer between an EQUIP contact code and a Registry Entity ID, enabling the EQUIP DBS number to appear in John Deere's Common Search Component (CSC) membership column across sales tools (JDQuote2, JDMint, Sales Center, Rewards, Warranty Portal, etc.).
+We are linking EQUIP (dealer DBS) customer contacts to John Deere's Customer Registry (IKC/CKC). A formal linkage creates a pointer between an EQUIP contact code and a Registry Entity ID, enabling the EQUIP DBS number to appear in John Deere's Common Search Component (CSC) membership column across sales tools (Sales Center, Rewards, Service Center, etc.).
 
 **Scale:** ~524,971 EQUIP accounts. ~58,282 formally linked. ~466,000 remaining.
 
